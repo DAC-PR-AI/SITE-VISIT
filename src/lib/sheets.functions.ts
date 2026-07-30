@@ -44,18 +44,43 @@ function rowsToBookings(rows: string[][]): Booking[] {
 }
 
 export const checkSheetConnection = createServerFn({ method: "GET" }).handler(async () => {
-  const hasSheetId = Boolean(process.env.GOOGLE_SHEET_ID);
-  const hasCreds = Boolean(
-    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) ||
-      process.env.GOOGLE_SHEETS_API_KEY ||
-      process.env.GOOGLE_ACCESS_TOKEN ||
-      process.env.LOVABLE_API_KEY,
-  );
-  return {
-    configured: hasSheetId && hasCreds,
-    sheetId: process.env.GOOGLE_SHEET_ID ? `${process.env.GOOGLE_SHEET_ID.slice(0, 6)}...` : null,
-    hasCreds,
-  };
+  const sheetIdVal = process.env.GOOGLE_SHEET_ID;
+  const saEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL;
+  const saKey = process.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const apiKey = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY;
+
+  if (!sheetIdVal) {
+    return {
+      configured: false,
+      reason: "GOOGLE_SHEET_ID is not set in environment variables.",
+      sheetId: null,
+    };
+  }
+
+  if (!saEmail && !saKey && !apiKey) {
+    return {
+      configured: false,
+      reason: "No Google API credentials found (GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_SHEETS_API_KEY).",
+      sheetId: `${sheetIdVal.slice(0, 8)}...`,
+    };
+  }
+
+  try {
+    const { getRange } = await import("./sheets.server");
+    await getRange("Projects!A1:B1");
+    return {
+      configured: true,
+      reason: "Successfully connected to Google Sheet.",
+      sheetId: `${sheetIdVal.slice(0, 8)}...`,
+    };
+  } catch (err: unknown) {
+    const message = (err as Error)?.message || "Unknown error";
+    return {
+      configured: false,
+      reason: `Google Sheet Connection Failed (${message})`,
+      sheetId: `${sheetIdVal.slice(0, 8)}...`,
+    };
+  }
 });
 
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {

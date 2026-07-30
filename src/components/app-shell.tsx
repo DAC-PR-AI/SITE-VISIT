@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center gap-2">
             <Info className="size-4 text-amber-600 shrink-0" />
             <span>
-              <strong>Demo Mode Active:</strong> Set <code>GOOGLE_SHEET_ID</code> & Google credentials in Vercel (Project Settings → Environment Variables) to enable live Google Sheets sync.
+              <strong>Demo Mode:</strong> {conn.reason} — Please set valid <code>GOOGLE_SHEET_ID</code> & Google credentials in Vercel Settings → Environment Variables.
             </span>
           </div>
         )}
