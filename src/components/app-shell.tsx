@@ -1,0 +1,95 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import { LayoutDashboard, CalendarClock, ListChecks, Plus, Building2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+type NavItem = { to: "/" | "/timeline" | "/bookings" | "/new"; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+const nav: NavItem[] = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/timeline", label: "Timeline", icon: CalendarClock },
+  { to: "/bookings", label: "All Bookings", icon: ListChecks },
+  { to: "/new", label: "New Booking", icon: Plus },
+];
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  return (
+    <div className="flex min-h-screen w-full bg-background font-body text-slate-900">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/70 bg-white/60 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-6 pt-6 pb-8">
+          <div className="grid size-9 place-items-center rounded-xl bg-primary text-white shadow-sm">
+            <Building2 className="size-5" />
+          </div>
+          <div>
+            <p className="font-display text-lg font-bold tracking-tight leading-none">Visitly</p>
+            <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+              Site Visits
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3">
+          {nav.map((item) => {
+            const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-white text-primary shadow-sm ring-1 ring-black/5"
+                    : "text-muted-foreground hover:bg-white/60 hover:text-slate-900",
+                )}
+              >
+                <Icon className="size-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="m-3 rounded-xl border border-border/70 bg-white/70 p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Sync
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
+            <span className="text-xs font-medium">Google Sheets · live</span>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top nav */}
+        <div className="md:hidden flex items-center gap-2 border-b border-border/70 bg-white/80 px-4 py-3">
+          <div className="grid size-8 place-items-center rounded-lg bg-primary text-white">
+            <Building2 className="size-4" />
+          </div>
+          <span className="font-display font-bold">Visitly</span>
+          <nav className="ml-auto flex gap-1 overflow-x-auto">
+            {nav.map((item) => {
+              const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap",
+                    active ? "bg-primary text-white" : "text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
+    </div>
+  );
+}
