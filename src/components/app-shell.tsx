@@ -1,7 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, CalendarClock, ListChecks, Plus, Building2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { LayoutDashboard, CalendarClock, ListChecks, Plus, Building2, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { checkSheetConnection } from "@/lib/sheets.functions";
 
 type NavItem = { to: "/" | "/timeline" | "/bookings" | "/new"; label: string; icon: typeof LayoutDashboard; exact?: boolean };
 const nav: NavItem[] = [
@@ -13,6 +16,12 @@ const nav: NavItem[] = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const checkConn = useServerFn(checkSheetConnection);
+  const { data: conn } = useQuery({
+    queryKey: ["sheet-connection"],
+    queryFn: () => checkConn(),
+    staleTime: 60000,
+  });
 
   return (
     <div className="flex min-h-screen w-full bg-background font-body text-slate-900">
@@ -53,11 +62,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="m-3 rounded-xl border border-border/70 bg-white/70 p-4">
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Sync
+            Sync Status
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
-            <span className="text-xs font-medium">Google Sheets · live</span>
+            <span
+              className={cn(
+                "size-2 rounded-full",
+                conn?.configured
+                  ? "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
+                  : "bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]",
+              )}
+            />
+            <span className="text-xs font-medium">
+              {conn?.configured ? "Google Sheets · live" : "Demo Mode (Mock Data)"}
+            </span>
           </div>
         </div>
       </aside>
@@ -87,6 +105,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
         </div>
+
+        {conn && !conn.configured && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center gap-2">
+            <Info className="size-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Demo Mode Active:</strong> Set <code>GOOGLE_SHEET_ID</code> & Google credentials in Vercel (Project Settings → Environment Variables) to enable live Google Sheets sync.
+            </span>
+          </div>
+        )}
 
         <main className="flex-1 min-w-0">{children}</main>
       </div>
