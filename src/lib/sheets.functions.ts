@@ -84,64 +84,65 @@ export const checkSheetConnection = createServerFn({ method: "GET" }).handler(as
 });
 
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
+  if (!process.env.GOOGLE_SHEET_ID) return MOCK_PROJECTS;
   try {
-    if (!process.env.GOOGLE_SHEET_ID) return MOCK_PROJECTS;
     const { getRange } = await import("./sheets.server");
     const rows = await getRange("Projects!A2:B");
-    if (!rows || rows.length === 0) return MOCK_PROJECTS;
-    const projects = rows
+    if (!rows) return [];
+    return rows
       .filter((r) => r[0] || r[1])
       .map<Project>((r) => ({ ProjectID: r[0] ?? "", ProjectName: r[1] ?? "" }));
-    return projects.length ? projects : MOCK_PROJECTS;
   } catch (err) {
-    console.warn("[sheets] Failed to list projects from Google Sheets, using mock data:", err);
-    return MOCK_PROJECTS;
+    console.error("[sheets] Failed to list projects from Google Sheets:", err);
+    throw err;
   }
 });
 
 export const listUnits = createServerFn({ method: "GET" }).handler(async () => {
+  if (!process.env.GOOGLE_SHEET_ID) return MOCK_UNITS;
   try {
-    if (!process.env.GOOGLE_SHEET_ID) return MOCK_UNITS;
     const { getRange } = await import("./sheets.server");
     const rows = await getRange("Units!A2:C");
-    if (!rows || rows.length === 0) return MOCK_UNITS;
-    const units = rows
+    if (!rows) return [];
+    return rows
       .filter((r) => r[0] || r[1])
       .map<Unit>((r) => ({
         ProjectID: r[0] ?? "",
         UnitNumber: r[1] ?? "",
         Availability: r[2] ?? "",
       }));
-    return units.length ? units : MOCK_UNITS;
   } catch (err) {
-    console.warn("[sheets] Failed to list units from Google Sheets, using mock data:", err);
-    return MOCK_UNITS;
+    console.error("[sheets] Failed to list units from Google Sheets:", err);
+    throw err;
   }
 });
 
 export const listBookings = createServerFn({ method: "GET" }).handler(async () => {
+  if (!process.env.GOOGLE_SHEET_ID) return getInMemoryBookings();
   try {
-    if (!process.env.GOOGLE_SHEET_ID) return getInMemoryBookings();
     const { getRange } = await import("./sheets.server");
     const rows = await getRange("Bookings!A2:M");
-    const bookings = rowsToBookings(rows);
-    return bookings.length ? bookings : getInMemoryBookings();
+    if (!rows) return [];
+    return rowsToBookings(rows);
   } catch (err) {
-    console.warn("[sheets] Failed to list bookings from Google Sheets, using mock data:", err);
-    return getInMemoryBookings();
+    console.error("[sheets] Failed to list bookings from Google Sheets:", err);
+    throw err;
   }
 });
 
 export const listDepartments = createServerFn({ method: "GET" }).handler(async () => {
+  if (!process.env.GOOGLE_SHEET_ID) return MOCK_DEPARTMENTS;
   try {
-    if (!process.env.GOOGLE_SHEET_ID) return MOCK_DEPARTMENTS;
     const { getRange } = await import("./sheets.server");
+    const { DEPARTMENTS } = await import("./departments");
     const rows = await getRange("Departments!A2:A");
+    if (!rows || rows.length === 0) return [...DEPARTMENTS];
     const names = rows.map((r) => (r[0] ?? "").trim()).filter(Boolean);
-    return names.length ? Array.from(new Set(names)) : MOCK_DEPARTMENTS;
+    return names.length ? Array.from(new Set(names)) : [...DEPARTMENTS];
   } catch (err) {
-    console.warn("[sheets] Failed to list departments from Google Sheets, using mock data:", err);
-    return MOCK_DEPARTMENTS;
+    console.error("[sheets] Failed to list departments from Google Sheets:", err);
+    const { DEPARTMENTS } = await import("./departments");
+    return [...DEPARTMENTS];
   }
 });
 
@@ -150,55 +151,46 @@ export const createBooking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { overlaps } = await import("./booking-types");
 
-    let existing: Booking[] = [];
-    let isGoogleLive = false;
-
     if (process.env.GOOGLE_SHEET_ID) {
-      try {
-        const { getRange, appendRow } = await import("./sheets.server");
-        const rows = await getRange("Bookings!A2:M");
-        existing = rowsToBookings(rows);
-        isGoogleLive = true;
+      const { getRange, appendRow } = await import("./sheets.server");
+      const rows = await getRange("Bookings!A2:M");
+      const existing = rowsToBookings(rows);
 
-        const conflict = existing.find(
-          (b) =>
-            b.ProjectName === data.ProjectName &&
-            b.UnitNumber === data.UnitNumber &&
-            b.VisitDate === data.VisitDate &&
-            overlaps(data.StartTime, data.EndTime, b.StartTime, b.EndTime),
+      const conflict = existing.find(
+        (b) =>
+          b.ProjectName === data.ProjectName &&
+          b.UnitNumber === data.UnitNumber &&
+          b.VisitDate === data.VisitDate &&
+          overlaps(data.StartTime, data.EndTime, b.StartTime, b.EndTime),
+      );
+      if (conflict) {
+        throw new Error(
+          `This unit is already booked from ${conflict.StartTime}–${conflict.EndTime} by ${conflict.EmployeeName}.`,
         );
-        if (conflict) {
-          throw new Error(
-            `This unit is already booked from ${conflict.StartTime}–${conflict.EndTime} by ${conflict.EmployeeName}.`,
-          );
-        }
-
-        const id = `BK${Date.now().toString(36).toUpperCase()}`;
-        const createdAt = new Date().toISOString();
-        await appendRow("Bookings!A:M", [
-          id,
-          data.EmployeeName,
-          data.Department,
-          data.CustomerName,
-          data.MobileNumber,
-          data.ProjectName,
-          data.UnitNumber,
-          data.VisitDate,
-          data.StartTime,
-          data.EndTime,
-          data.Purpose,
-          data.Remarks,
-          createdAt,
-        ]);
-        return { id };
-      } catch (err: unknown) {
-        if ((err as Error)?.message?.includes("already booked")) throw err;
-        console.warn("[sheets] Google Sheets createBooking error, using mock data:", err);
       }
+
+      const id = `BK${Date.now().toString(36).toUpperCase()}`;
+      const createdAt = new Date().toISOString();
+      await appendRow("Bookings!A:M", [
+        id,
+        data.EmployeeName,
+        data.Department,
+        data.CustomerName,
+        data.MobileNumber,
+        data.ProjectName,
+        data.UnitNumber,
+        data.VisitDate,
+        data.StartTime,
+        data.EndTime,
+        data.Purpose,
+        data.Remarks,
+        createdAt,
+      ]);
+      return { id };
     }
 
-    // Fallback to in-memory store if Google Sheets is not configured or failed
-    existing = getInMemoryBookings();
+    // Fallback to in-memory store ONLY if GOOGLE_SHEET_ID is not set at all
+    const existing = getInMemoryBookings();
     const conflict = existing.find(
       (b) =>
         b.ProjectName === data.ProjectName &&
@@ -250,44 +242,39 @@ export const updateBooking = createServerFn({ method: "POST" })
     const { overlaps } = await import("./booking-types");
 
     if (process.env.GOOGLE_SHEET_ID) {
-      try {
-        const { getRange, updateRange } = await import("./sheets.server");
-        const rows = await getRange("Bookings!A2:M");
-        const existing = rowsToBookings(rows);
-        const conflict = existing.find(
-          (b) =>
-            b.BookingID !== data.BookingID &&
-            b.ProjectName === data.ProjectName &&
-            b.UnitNumber === data.UnitNumber &&
-            b.VisitDate === data.VisitDate &&
-            overlaps(data.StartTime, data.EndTime, b.StartTime, b.EndTime),
+      const { getRange, updateRange } = await import("./sheets.server");
+      const rows = await getRange("Bookings!A2:M");
+      const existing = rowsToBookings(rows);
+      const conflict = existing.find(
+        (b) =>
+          b.BookingID !== data.BookingID &&
+          b.ProjectName === data.ProjectName &&
+          b.UnitNumber === data.UnitNumber &&
+          b.VisitDate === data.VisitDate &&
+          overlaps(data.StartTime, data.EndTime, b.StartTime, b.EndTime),
+      );
+      if (conflict) {
+        throw new Error(
+          `This unit is already booked from ${conflict.StartTime}–${conflict.EndTime}.`,
         );
-        if (conflict) {
-          throw new Error(
-            `This unit is already booked from ${conflict.StartTime}–${conflict.EndTime}.`,
-          );
-        }
-        const orig = existing.find((b) => b.BookingID === data.BookingID);
-        await updateRange(`Bookings!A${data._row}:M${data._row}`, [
-          data.BookingID,
-          data.EmployeeName,
-          data.Department,
-          data.CustomerName,
-          data.MobileNumber,
-          data.ProjectName,
-          data.UnitNumber,
-          data.VisitDate,
-          data.StartTime,
-          data.EndTime,
-          data.Purpose,
-          data.Remarks,
-          orig?.CreatedAt || new Date().toISOString(),
-        ]);
-        return { ok: true };
-      } catch (err: unknown) {
-        if ((err as Error)?.message?.includes("already booked")) throw err;
-        console.warn("[sheets] Google Sheets updateBooking error, using mock fallback:", err);
       }
+      const orig = existing.find((b) => b.BookingID === data.BookingID);
+      await updateRange(`Bookings!A${data._row}:M${data._row}`, [
+        data.BookingID,
+        data.EmployeeName,
+        data.Department,
+        data.CustomerName,
+        data.MobileNumber,
+        data.ProjectName,
+        data.UnitNumber,
+        data.VisitDate,
+        data.StartTime,
+        data.EndTime,
+        data.Purpose,
+        data.Remarks,
+        orig?.CreatedAt || new Date().toISOString(),
+      ]);
+      return { ok: true };
     }
 
     updateInMemoryBooking(data);
@@ -299,13 +286,9 @@ export const deleteBooking = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertAdmin(data.adminCode);
     if (process.env.GOOGLE_SHEET_ID) {
-      try {
-        const { clearRange } = await import("./sheets.server");
-        await clearRange(`Bookings!A${data._row}:M${data._row}`);
-        return { ok: true };
-      } catch (err) {
-        console.warn("[sheets] Google Sheets deleteBooking error, using mock fallback:", err);
-      }
+      const { clearRange } = await import("./sheets.server");
+      await clearRange(`Bookings!A${data._row}:M${data._row}`);
+      return { ok: true };
     }
     deleteInMemoryBooking(data._row);
     return { ok: true };
