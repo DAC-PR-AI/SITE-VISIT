@@ -13,6 +13,23 @@ function base64url(str: string | Buffer): string {
   return base64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
+function formatPrivateKey(key: string): string {
+  let cleaned = key.trim();
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  cleaned = cleaned.replace(/\\n/g, "\n").replace(/\\r/g, "");
+  if (!cleaned.includes("\n") && cleaned.includes("-----BEGIN PRIVATE KEY-----")) {
+    cleaned = cleaned
+      .replace("-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n")
+      .replace("-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----");
+  }
+  return cleaned.trim();
+}
+
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
 
 async function getServiceAccountToken(clientEmail: string, privateKey: string): Promise<string> {
@@ -21,7 +38,7 @@ async function getServiceAccountToken(clientEmail: string, privateKey: string): 
     return cachedAccessToken.token;
   }
 
-  const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
+  const formattedPrivateKey = formatPrivateKey(privateKey);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64url(
     JSON.stringify({
