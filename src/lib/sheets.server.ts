@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 
 const GOOGLE_API_BASE = "https://sheets.googleapis.com/v4";
-const LOVABLE_GATEWAY_BASE = "https://connector-gateway.lovable.dev/google_sheets/v4";
 
 function sheetId(): string {
   const id = process.env.GOOGLE_SHEET_ID;
@@ -81,19 +80,6 @@ async function getApiConfig() {
 
   const apiKey = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY;
   const accessToken = process.env.GOOGLE_ACCESS_TOKEN || process.env.GOOGLE_SERVICE_ACCOUNT_TOKEN;
-  const lovableApiKey = process.env.LOVABLE_API_KEY;
-
-  if (lovableApiKey) {
-    return {
-      baseUrl: `${LOVABLE_GATEWAY_BASE}/spreadsheets/${sheetIdVal}`,
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "X-Connection-Api-Key": apiKey || "",
-        "Content-Type": "application/json",
-      } as Record<string, string>,
-      queryParams: "",
-    };
-  }
 
   if (!apiKey && !accessToken) {
     throw new Error(
