@@ -82,20 +82,25 @@ async function getApiConfig() {
   const sheetIdVal = sheetId();
   const saEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL;
   const saKey = process.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const apiKey = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY;
 
   if (saEmail && saKey) {
-    const token = await getServiceAccountToken(saEmail, saKey);
-    return {
-      baseUrl: `${GOOGLE_API_BASE}/spreadsheets/${sheetIdVal}`,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      } as Record<string, string>,
-      queryParams: "",
-    };
+    try {
+      const token = await getServiceAccountToken(saEmail, saKey);
+      return {
+        baseUrl: `${GOOGLE_API_BASE}/spreadsheets/${sheetIdVal}`,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        } as Record<string, string>,
+        queryParams: "",
+      };
+    } catch (saErr) {
+      console.warn("[sheets] Service Account Token failed:", (saErr as Error)?.message);
+      if (!apiKey) throw saErr;
+    }
   }
 
-  const apiKey = process.env.GOOGLE_SHEETS_API_KEY || process.env.GOOGLE_API_KEY;
   const accessToken = process.env.GOOGLE_ACCESS_TOKEN || process.env.GOOGLE_SERVICE_ACCOUNT_TOKEN;
 
   if (!apiKey && !accessToken) {

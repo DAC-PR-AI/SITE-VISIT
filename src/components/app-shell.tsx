@@ -27,12 +27,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full bg-background font-body text-slate-900">
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/70 bg-white/60 backdrop-blur-sm">
         <div className="flex items-center gap-3 px-6 pt-6 pb-8">
-          <div className="grid size-9 place-items-center rounded-xl bg-primary text-white shadow-sm">
-            <Building2 className="size-5" />
+          <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white shadow-md font-display font-black tracking-wider text-xs">
+            DAC
           </div>
           <div>
-            <p className="font-display text-lg font-bold tracking-tight leading-none">Visitly</p>
-            <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+            <p className="font-display text-base font-bold tracking-tight leading-none text-slate-900">DAC Developers</p>
+            <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
               Site Visits
             </p>
           </div>
@@ -83,10 +83,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top nav */}
         <div className="md:hidden flex items-center gap-2 border-b border-border/70 bg-white/80 px-4 py-3">
-          <div className="grid size-8 place-items-center rounded-lg bg-primary text-white">
-            <Building2 className="size-4" />
+          <div className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white font-display font-black text-[10px]">
+            DAC
           </div>
-          <span className="font-display font-bold">Visitly</span>
+          <span className="font-display font-bold text-sm">DAC Developers</span>
           <nav className="ml-auto flex gap-1 overflow-x-auto">
             {nav.map((item) => {
               const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);

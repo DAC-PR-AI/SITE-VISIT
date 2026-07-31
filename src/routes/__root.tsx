@@ -79,10 +79,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Visitly — Site Visit Booking" },
-      { name: "description", content: "Premium site-visit booking dashboard for real estate teams." },
-      { property: "og:title", content: "Visitly — Site Visit Booking" },
-      { property: "og:description", content: "Premium site-visit booking dashboard for real estate teams." },
+      { title: "DAC Developers — Site Visit Booking" },
+      { name: "description", content: "Site visit booking dashboard for DAC Developers real estate teams." },
+      { property: "og:title", content: "DAC Developers — Site Visit Booking" },
+      { property: "og:description", content: "Site visit booking dashboard for DAC Developers real estate teams." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -91,7 +91,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/dac-logo.png", type: "image/png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
