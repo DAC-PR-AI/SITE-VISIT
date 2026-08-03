@@ -27,8 +27,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full bg-background font-body text-slate-900">
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border/70 bg-white/60 backdrop-blur-sm">
         <div className="flex items-center gap-3 px-6 pt-6 pb-8">
-          <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white shadow-md font-display font-black tracking-wider text-xs">
-            DAC
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md">
+            <img src="/dac-logo.png" alt="DAC Developers" className="h-8 w-8 object-contain" />
           </div>
           <div>
             <p className="font-display text-base font-bold tracking-tight leading-none text-slate-900">DAC Developers</p>
