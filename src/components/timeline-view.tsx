@@ -52,7 +52,7 @@ export function TimelineView({
   const saveStatus = useServerFn(updateBookingStatus);
   const statusMutation = useMutation({
     mutationFn: async ({ bookingId, status }: { bookingId: string; status: VisitStatusValue }) =>
-      saveStatus({ bookingId, status }),
+      saveStatus({ data: { bookingId, status } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },

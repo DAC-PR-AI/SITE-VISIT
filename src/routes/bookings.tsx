@@ -106,7 +106,7 @@ function BookingsPage() {
       End: b.EndTime,
       Purpose: b.Purpose,
       Remarks: b.Remarks,
-      "sheets": normalizeVisitStatus(b.VisitStatus) === "Unknown" ? "" : normalizeVisitStatus(b.VisitStatus),
+      "Status": normalizeVisitStatus(b.VisitStatus) === "Unknown" ? "" : normalizeVisitStatus(b.VisitStatus),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();

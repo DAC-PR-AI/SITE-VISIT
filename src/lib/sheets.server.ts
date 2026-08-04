@@ -241,7 +241,7 @@ const TABS: Record<string, string[]> = {
     "Purpose",
     "Remarks",
     "CreatedAt",
-    "sheets",
+    "Status",
   ],
 };
 
