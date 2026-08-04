@@ -130,7 +130,7 @@ function Dashboard() {
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </p>
           <h1 className="mt-1 font-display text-3xl font-bold tracking-tight md:text-4xl">
-            SITE VISIT TRACKER
+            Site Visit Tracker
           </h1>
           <p className="mt-1 text-muted-foreground">
             {projects.length} projects · {units.length} units · synced live from Google Sheets
