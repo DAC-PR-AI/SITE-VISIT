@@ -32,11 +32,13 @@ export function TimelineView({
   projectNames,
   departments,
   date: initialDate,
+  onVisitStatusChange,
 }: {
   bookings: Booking[];
   projectNames: string[];
   departments?: string[];
   date?: string;
+  onVisitStatusChange?: (bookingId: string, status: "Yes" | "No" | "Unknown") => void;
 }) {
   const [date, setDate] = useState(initialDate || todayISO());
   const [selected, setSelected] = useState<Booking | null>(null);
@@ -190,6 +192,7 @@ export function TimelineView({
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setStatusByBookingId((current) => ({ ...current, [b.BookingID]: "Yes" }));
+                                  onVisitStatusChange?.(b.BookingID, "Yes");
                                   setPromptBookingId(null);
                                 }}
                               >
@@ -203,6 +206,7 @@ export function TimelineView({
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setStatusByBookingId((current) => ({ ...current, [b.BookingID]: "No" }));
+                                  onVisitStatusChange?.(b.BookingID, "No");
                                   setPromptBookingId(null);
                                 }}
                               >

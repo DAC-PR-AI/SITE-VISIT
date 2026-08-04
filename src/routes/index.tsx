@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 import { queryOptions } from "@tanstack/react-query";
 import { listBookings, listDepartments, listProjects, listUnits } from "@/lib/sheets.functions";
 import { deptColors } from "@/lib/departments";
@@ -9,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { CalendarClock, Users, Building2, TrendingUp, Plus, ArrowRight } from "lucide-react";
 import { TimelineView } from "@/components/timeline-view";
 import type { Booking } from "@/lib/booking-types";
-import { toMinutes } from "@/lib/booking-types";
+import { normalizeVisitStatus, toMinutes } from "@/lib/booking-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,9 +50,27 @@ function Dashboard() {
   const todays = bookings.filter((b) => b.VisitDate === today);
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const [visitStatusByBookingId, setVisitStatusByBookingId] = useState<Record<string, "Yes" | "No" | "Unknown">>({});
+
+  const getEffectiveStatus = (booking: Booking) => {
+    const override = visitStatusByBookingId[booking.BookingID];
+    if (override) return override;
+    return normalizeVisitStatus(booking.VisitStatus);
+  };
+
   const upcoming = todays.filter((b) => toMinutes(b.StartTime) > currentMinutes).length;
-  const completed = todays.filter((b) => toMinutes(b.EndTime) <= currentMinutes).length;
-  const notCompleted = todays.filter((b) => toMinutes(b.EndTime) > currentMinutes).length;
+  const completed = todays.filter((b) => {
+    const status = getEffectiveStatus(b);
+    if (status === "Yes") return true;
+    if (status === "No") return false;
+    return toMinutes(b.EndTime) <= currentMinutes;
+  }).length;
+  const notCompleted = todays.filter((b) => {
+    const status = getEffectiveStatus(b);
+    if (status === "No") return true;
+    if (status === "Yes") return false;
+    return toMinutes(b.EndTime) > currentMinutes;
+  }).length;
   const uniqueEmployees = new Set(bookings.map((b) => b.EmployeeName)).size;
 
   const departmentBreakdown = departments.length
@@ -68,6 +87,10 @@ function Dashboard() {
       ).map(([dept, count]) => ({ dept, count }));
 
   const projectSummaries = projects.map((project) => getProjectSnapshot(project.ProjectName, bookings, today));
+
+  const handleVisitStatusChange = (bookingId: string, status: "Yes" | "No" | "Unknown") => {
+    setVisitStatusByBookingId((current) => ({ ...current, [bookingId]: status }));
+  };
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8 md:py-10 space-y-8">
@@ -105,49 +128,6 @@ function Dashboard() {
         <KpiCard icon={Users} label="Employees Booking" value={uniqueEmployees} accent="bg-purple-500" />
       </div>
 
-      {/* Project pulse */}
-      <section className="space-y-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold">Project Pulse</h2>
-            <p className="text-sm text-muted-foreground">At-a-glance status for each project, including today’s visit volume and the next upcoming visit</p>
-          </div>
-        </div>
-        <div className="grid gap-4 xl:grid-cols-3">
-          {projectSummaries.map((summary, index) => {
-            const badgeClass =
-              summary.status === "Busy"
-                ? "bg-orange-100 text-orange-700"
-                : summary.status === "No Visits Today"
-                  ? "bg-slate-100 text-slate-700"
-                  : "bg-emerald-100 text-emerald-700";
-            return (
-              <Card key={`${summary.projectName}-${index}`} className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-lg font-semibold">{summary.projectName}</p>
-                    <p className="text-sm text-muted-foreground">Today’s visits: {summary.todayCount}</p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${badgeClass}`}>
-                    {summary.status}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Visit count</p>
-                    <p className="text-2xl font-semibold">{summary.todayCount}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Next visit</p>
-                    <p className="mt-1 text-sm font-medium text-foreground">{summary.nextVisit}</p>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
-
       {/* Timeline preview */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
@@ -162,7 +142,13 @@ function Dashboard() {
             </Link>
           </Button>
         </div>
-        <TimelineView bookings={bookings} projectNames={projects.map((p) => p.ProjectName)} departments={departments} date={today} />
+        <TimelineView
+          bookings={bookings}
+          projectNames={projects.map((p) => p.ProjectName)}
+          departments={departments}
+          date={today}
+          onVisitStatusChange={handleVisitStatusChange}
+        />
       </section>
 
       {/* Split: Department breakdown + Recent */}
