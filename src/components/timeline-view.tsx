@@ -47,7 +47,8 @@ export function TimelineView({
   const [date, setDate] = useState(initialDate || todayISO());
   const [selected, setSelected] = useState<Booking | null>(null);
   const [promptBookingId, setPromptBookingId] = useState<string | null>(null);
-  const [statusByBookingId, setStatusByBookingId] = useState<Record<string, "Yes" | "No" | "Unknown">>({});
+  // Optimistic overrides – populated immediately on click so colour never reverts
+  const [overrides, setOverrides] = useState<Record<string, "Yes" | "No" | "Unknown">>({});
   const queryClient = useQueryClient();
   const saveStatus = useServerFn(updateBookingStatus);
   const statusMutation = useMutation({
@@ -58,6 +59,14 @@ export function TimelineView({
     },
     onError: (error: Error) => toast.error(error.message || "Unable to save booking status."),
   });
+
+  // Effective status: prefer server data (kept fresh by refetchInterval) but
+  // fall back to local optimistic override so the colour is instant.
+  const effectiveStatus = (b: Booking): VisitStatusValue => {
+    const fromServer = normalizeVisitStatus(b.VisitStatus);
+    if (fromServer !== "Unknown") return fromServer;
+    return overrides[b.BookingID] ?? "Unknown";
+  };
 
   const dayBookings = useMemo(() => bookings.filter((b) => b.VisitDate === date), [bookings, date]);
 
@@ -109,18 +118,22 @@ export function TimelineView({
         <p className="ml-auto font-display font-semibold">{formatDay(date)}</p>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        {legendDepartments.map((d) => {
-          const c = deptColors(d);
-          return (
-            <div key={d} className="flex items-center gap-1.5 text-xs">
-              <span className={`size-2.5 rounded-full ${c.solid}`} />
-              <span className="text-muted-foreground">{d}</span>
-            </div>
-          );
-        })}
-      </div>
+      {/* Legend – show only HUG */}
+      {legendDepartments.filter((d) => d.toUpperCase().includes("HUG")).length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+          {legendDepartments
+            .filter((d) => d.toUpperCase().includes("HUG"))
+            .map((d) => {
+              const c = deptColors(d);
+              return (
+                <div key={d} className="flex items-center gap-1.5 text-xs">
+                  <span className={`size-2.5 rounded-full ${c.solid}`} />
+                  <span className="text-muted-foreground">{d}</span>
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       {/* Grid */}
       <div className="overflow-x-auto">
@@ -169,7 +182,7 @@ export function TimelineView({
                     const width = Math.max(2, ((Math.min(end, totalMinutes) - Math.max(start, 0)) / totalMinutes) * 100);
                     const departmentLabel = normalizeDepartmentName(b.Department);
                     const c = deptColors(departmentLabel);
-                    const status = normalizeVisitStatus(statusByBookingId[b.BookingID] ?? b.VisitStatus);
+                    const status = effectiveStatus(b);
                     const statusClasses =
                       status === "Yes"
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-800"
@@ -213,7 +226,7 @@ export function TimelineView({
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   const status: VisitStatusValue = "Yes";
-                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: status }));
+                                  setOverrides((cur) => ({ ...cur, [b.BookingID]: status }));
                                   onVisitStatusChange?.(b.BookingID, status);
                                   statusMutation.mutate({ bookingId: b.BookingID, status });
                                   setPromptBookingId(null);
@@ -229,7 +242,7 @@ export function TimelineView({
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   const status: VisitStatusValue = "No";
-                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: status }));
+                                  setOverrides((cur) => ({ ...cur, [b.BookingID]: status }));
                                   onVisitStatusChange?.(b.BookingID, status);
                                   statusMutation.mutate({ bookingId: b.BookingID, status });
                                   setPromptBookingId(null);
