@@ -160,7 +160,7 @@ export const listDepartments = createServerFn({ method: "GET" }).handler(async (
     if (!rows || rows.length === 0) return [...DEPARTMENTS];
     const names = rows
       .map((r) => normalizeDepartmentName(r[0] ?? ""))
-      .filter((name): name is string => Boolean(name) && name !== "Other");
+      .filter((name): name is string => Boolean(name));
     return names.length ? Array.from(new Set(names)) : [...DEPARTMENTS];
   } catch (err) {
     if (isQuotaExceededError(err)) {

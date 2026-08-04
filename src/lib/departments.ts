@@ -6,6 +6,7 @@ export const DEPARTMENTS = [
   "HR",
   "Management",
   "CRM",
+  "HUG",
 ] as const;
 
 export type Department = (typeof DEPARTMENTS)[number] | string;
@@ -27,10 +28,11 @@ export function normalizeDepartmentName(dept?: string): string {
     management: "Management",
     crm: "CRM",
     customerrelationshipmanagement: "CRM",
+    hug: "HUG",
   };
 
   if (aliases[normalized]) return aliases[normalized];
-  return DEPARTMENTS.includes(raw as (typeof DEPARTMENTS)[number]) ? raw : "Other";
+  return DEPARTMENTS.includes(raw as (typeof DEPARTMENTS)[number]) ? raw : raw;
 }
 
 // Static Tailwind classes so JIT keeps them. Keyed by lowercase dept.
@@ -93,6 +95,14 @@ const MAP: Record<
     text: "text-cyan-700",
     solid: "bg-cyan-500",
     ring: "ring-cyan-200",
+  },
+  hug: {
+    dot: "bg-[--color-dept-hug]",
+    bg: "bg-violet-50",
+    border: "border-violet-500",
+    text: "text-violet-700",
+    solid: "bg-violet-500",
+    ring: "ring-violet-200",
   },
   other: {
     dot: "bg-slate-400",

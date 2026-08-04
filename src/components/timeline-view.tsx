@@ -55,15 +55,13 @@ export function TimelineView({
   const legendDepartments = useMemo(() => {
     const fromSheet = (departments ?? [])
       .map(normalizeDepartmentName)
-      .filter((d): d is string => Boolean(d) && d !== "Other");
+      .filter((d): d is string => Boolean(d));
     const fromBookings = Array.from(
-      new Set(bookings.map((b) => normalizeDepartmentName(b.Department)).filter((d): d is string => Boolean(d) && d !== "Other")),
+      new Set(bookings.map((b) => normalizeDepartmentName(b.Department)).filter((d): d is string => Boolean(d))),
     );
 
-    const visible = Array.from(new Set([...fromSheet, ...fromBookings]));
-    const ordered = visible.filter((d) => DEPARTMENTS.includes(d as (typeof DEPARTMENTS)[number]));
-
-    return ordered.length ? ordered : [...DEPARTMENTS];
+    const visible = Array.from(new Set([...fromSheet, ...fromBookings])).filter((d) => d !== "Other");
+    return visible.length ? visible : [...DEPARTMENTS];
   }, [departments, bookings]);
 
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
