@@ -79,9 +79,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DAC Developers — Site Visit Booking" },
+      { title: "SITE VISIT-TRACKER" },
       { name: "description", content: "Site visit booking dashboard for DAC Developers real estate teams." },
-      { property: "og:title", content: "DAC Developers — Site Visit Booking" },
+      { property: "og:title", content: "SITE VISIT-TRACKER" },
       { property: "og:description", content: "Site visit booking dashboard for DAC Developers real estate teams." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

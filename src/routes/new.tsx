@@ -25,6 +25,7 @@ const bookingsQO = queryOptions({
   gcTime: 10 * 60_000,
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
+  refetchInterval: 5000,
 });
 const projectsQO = queryOptions({
   queryKey: ["projects"],
@@ -54,9 +55,9 @@ const departmentsQO = queryOptions({
 export const Route = createFileRoute("/new")({
   head: () => ({
     meta: [
-      { title: "New Booking — Visitly" },
+      { title: "SITE VISIT-TRACKER" },
       { name: "description", content: "Book a customer site visit with automatic conflict checking." },
-      { property: "og:title", content: "New Booking — Visitly" },
+      { property: "og:title", content: "SITE VISIT-TRACKER" },
       { property: "og:description", content: "Book a customer site visit with automatic conflict checking." },
     ],
   }),

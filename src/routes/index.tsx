@@ -15,9 +15,9 @@ import { normalizeVisitStatus, toMinutes } from "@/lib/booking-types";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Visitly Site Visit Booking" },
+      { title: "SITE VISIT-TRACKER" },
       { name: "description", content: "Overview of today's site visits, project availability, and booking activity." },
-      { property: "og:title", content: "Dashboard — Visitly" },
+      { property: "og:title", content: "SITE VISIT-TRACKER" },
       { property: "og:description", content: "Overview of today's site visits, project availability, and booking activity." },
     ],
   }),
@@ -37,6 +37,7 @@ const bookingsQO = queryOptions({
   gcTime: 10 * 60_000,
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
+  refetchInterval: 5000,
 });
 const projectsQO = queryOptions({
   queryKey: ["projects"],
