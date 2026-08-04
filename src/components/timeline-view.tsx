@@ -71,8 +71,17 @@ export function TimelineView({
   const dayBookings = useMemo(() => bookings.filter((b) => b.VisitDate === date), [bookings, date]);
 
   const rows = useMemo(() => {
-    const projects = projectNames.length ? projectNames : Array.from(new Set(bookings.map((b) => b.ProjectName))).filter(Boolean);
-    return projects;
+    // Always include project names derived from actual bookings so tiles are
+    // never invisible due to a name mismatch between the Projects sheet and
+    // booking data. Projects from the sheet come first (preserving order),
+    // then any extra project names found only in bookings.
+    const fromSheet = new Set(projectNames);
+    const fromBookings = Array.from(new Set(bookings.map((b) => b.ProjectName))).filter(Boolean);
+    const merged = [
+      ...projectNames,
+      ...fromBookings.filter((p) => !fromSheet.has(p)),
+    ];
+    return merged.length ? merged : fromBookings;
   }, [projectNames, bookings]);
 
   const legendDepartments = useMemo(() => {
