@@ -227,6 +227,7 @@ const TABS: Record<string, string[]> = {
   Projects: ["ProjectID", "ProjectName"],
   Units: ["ProjectID", "UnitNumber", "Availability"],
   Departments: ["Department"],
+  Purposes: ["Purpose"],
   Bookings: [
     "BookingID",
     "EmployeeName",
@@ -244,6 +245,14 @@ const TABS: Record<string, string[]> = {
     "Status",
   ],
 };
+
+const DEFAULT_PURPOSES = [
+  "General Site Visit",
+  "Customization",
+  "Joint Inspection - Interior",
+  "Joint Inspection - Final Key",
+  "Others",
+];
 
 const DEFAULT_DEPARTMENTS = [
   "Sales",
@@ -307,6 +316,20 @@ export async function ensureTabs(): Promise<{ created: string[]; existing: strin
         method: "PUT",
         headers: config.headers,
         body: JSON.stringify({ values: DEFAULT_DEPARTMENTS.map((d) => [d]) }),
+      }),
+    );
+  }
+  const purposeRows = await getRange("Purposes!A2:A");
+  if (purposeRows.filter((r) => (r[0] ?? "").trim()).length === 0) {
+    const seedUrl = appendQueryParam(
+      `${config.baseUrl}/values/${encodeURIComponent("Purposes!A2:A")}?valueInputOption=RAW`,
+      config.queryParams,
+    );
+    await handle(
+      await fetch(seedUrl, {
+        method: "PUT",
+        headers: config.headers,
+        body: JSON.stringify({ values: DEFAULT_PURPOSES.map((p) => [p]) }),
       }),
     );
   }

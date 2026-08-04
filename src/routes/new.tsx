@@ -3,7 +3,7 @@ import { queryOptions, useMutation, useQueryClient, useSuspenseQuery } from "@ta
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
-import { createBooking, listBookings, listDepartments, listProjects, listUnits, updateBooking } from "@/lib/sheets.functions";
+import { createBooking, listBookings, listDepartments, listProjects, listPurposes, listUnits, updateBooking } from "@/lib/sheets.functions";
 import { deptColors } from "@/lib/departments";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,6 +51,15 @@ const departmentsQO = queryOptions({
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
 });
+const purposesQO = queryOptions({
+  queryKey: ["purposes"],
+  queryFn: () => listPurposes(),
+  staleTime: 30_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+  refetchInterval: 15000,
+});
 
 export const Route = createFileRoute("/new")({
   head: () => ({
@@ -67,6 +76,7 @@ export const Route = createFileRoute("/new")({
     context.queryClient.ensureQueryData(unitsQO);
     context.queryClient.ensureQueryData(bookingsQO);
     context.queryClient.ensureQueryData(departmentsQO);
+    context.queryClient.ensureQueryData(purposesQO);
   },
   component: NewBookingPage,
 });
@@ -112,6 +122,7 @@ function NewBookingPage() {
   const units = useSuspenseQuery(unitsQO).data;
   const bookings = useSuspenseQuery(bookingsQO).data;
   const departments = useSuspenseQuery(departmentsQO).data;
+  const purposes = useSuspenseQuery(purposesQO).data;
   const qc = useQueryClient();
 
   const editing = useMemo(() => bookings.find((b) => b.BookingID === edit) || null, [bookings, edit]);
@@ -373,7 +384,14 @@ function NewBookingPage() {
             </Field>
 
             <Field label="Purpose" error={errors.Purpose} className="md:col-span-2">
-              <Input value={form.Purpose} onChange={(e) => set("Purpose", e.target.value)} placeholder="Property viewing, negotiation, final walkthrough…" />
+              <Select value={form.Purpose} onValueChange={(v) => set("Purpose", v)}>
+                <SelectTrigger><SelectValue placeholder="Select visit purpose" /></SelectTrigger>
+                <SelectContent>
+                  {purposes.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
 
             <Field label="Remarks" error={errors.Remarks} className="md:col-span-2">

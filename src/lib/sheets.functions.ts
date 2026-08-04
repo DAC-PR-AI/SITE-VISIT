@@ -194,6 +194,34 @@ export const listDepartments = createServerFn({ method: "GET" }).handler(async (
   }
 });
 
+const DEFAULT_PURPOSES = [
+  "General Site Visit",
+  "Customization",
+  "Joint Inspection - Interior",
+  "Joint Inspection - Final Key",
+  "Others",
+];
+
+export const listPurposes = createServerFn({ method: "GET" }).handler(async () => {
+  if (!process.env.GOOGLE_SHEET_ID) return DEFAULT_PURPOSES;
+  try {
+    const { getRange } = await import("./sheets.server");
+    const rows = await getRange("Purposes!A2:A");
+    if (!rows || rows.length === 0) return DEFAULT_PURPOSES;
+    const names = rows
+      .map((r) => (r[0] ?? "").trim())
+      .filter((name): name is string => Boolean(name));
+    return names.length ? Array.from(new Set(names)) : DEFAULT_PURPOSES;
+  } catch (err) {
+    if (isQuotaExceededError(err)) {
+      console.warn("[sheets] Google Sheets quota exceeded while listing purposes — using defaults.");
+      return DEFAULT_PURPOSES;
+    }
+    console.error("[sheets] Failed to list purposes from Google Sheets:", err);
+    return DEFAULT_PURPOSES;
+  }
+});
+
 export const createBooking = createServerFn({ method: "POST" })
   .inputValidator((data: BookingInput) => data)
   .handler(async ({ data }) => {
