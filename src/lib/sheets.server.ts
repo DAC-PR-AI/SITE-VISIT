@@ -188,33 +188,39 @@ export async function appendRow(range: string, row: (string | number)[]) {
   const config = await getApiConfig();
   const rawUrl = `${config.baseUrl}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const url = appendQueryParam(rawUrl, config.queryParams);
-  return handle(
+  const result = await handle(
     await fetch(url, {
       method: "POST",
       headers: config.headers,
       body: JSON.stringify({ values: [row] }),
     }),
   );
+  RANGE_CACHE.clear();
+  return result;
 }
 
 export async function updateRange(range: string, row: (string | number)[]) {
   const config = await getApiConfig();
   const rawUrl = `${config.baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const url = appendQueryParam(rawUrl, config.queryParams);
-  return handle(
+  const result = await handle(
     await fetch(url, {
       method: "PUT",
       headers: config.headers,
       body: JSON.stringify({ values: [row] }),
     }),
   );
+  RANGE_CACHE.clear();
+  return result;
 }
 
 export async function clearRange(range: string) {
   const config = await getApiConfig();
   const rawUrl = `${config.baseUrl}/values/${encodeURIComponent(range)}:clear`;
   const url = appendQueryParam(rawUrl, config.queryParams);
-  return handle(await fetch(url, { method: "POST", headers: config.headers }));
+  const result = await handle(await fetch(url, { method: "POST", headers: config.headers }));
+  RANGE_CACHE.clear();
+  return result;
 }
 
 const TABS: Record<string, string[]> = {
