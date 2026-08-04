@@ -11,7 +11,7 @@ import {
 } from "./mock-data";
 import { DEPARTMENTS, normalizeDepartmentName } from "./departments";
 
-const BOOKING_COLS = 14; // A..N
+const BOOKING_COLS = 15; // A..O
 
 function isQuotaExceededError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -44,7 +44,7 @@ function rowsToBookings(rows: string[][]): Booking[] {
         Purpose: p[10],
         Remarks: p[11],
         CreatedAt: p[12],
-        VisitStatus: p[13] || undefined,
+        VisitStatus: p[13] || p[14] || undefined,
         _row: i + 2, // header is row 1
       } as Booking;
     })
@@ -66,7 +66,8 @@ function bookingToSheetRow(booking: Booking, visitStatus?: string) {
     booking.Purpose,
     booking.Remarks,
     booking.CreatedAt,
-    visitStatus ?? booking.VisitStatus ?? "",
+    "", // col N – reserved / was old Status header
+    visitStatus ?? booking.VisitStatus ?? "", // col O – Status (user's column)
   ] as (string | number)[];
 }
 
@@ -159,7 +160,7 @@ export const listBookings = createServerFn({ method: "GET" }).handler(async () =
   if (!process.env.GOOGLE_SHEET_ID) return getInMemoryBookings();
   try {
     const { getRange } = await import("./sheets.server");
-    const rows = await getRange("Bookings!A2:M");
+    const rows = await getRange("Bookings!A2:O");
     if (!rows) return [];
     return rowsToBookings(rows);
   } catch (err) {
@@ -200,7 +201,7 @@ export const createBooking = createServerFn({ method: "POST" })
 
     if (process.env.GOOGLE_SHEET_ID) {
       const { getRange, appendRow } = await import("./sheets.server");
-      const rows = await getRange("Bookings!A2:M");
+      const rows = await getRange("Bookings!A2:O");
       const existing = rowsToBookings(rows);
 
       const conflict = existing.find(
@@ -291,7 +292,7 @@ export const updateBooking = createServerFn({ method: "POST" })
 
     if (process.env.GOOGLE_SHEET_ID) {
       const { getRange, updateRange } = await import("./sheets.server");
-      const rows = await getRange("Bookings!A2:N");
+      const rows = await getRange("Bookings!A2:O");
       const existing = rowsToBookings(rows);
       const conflict = existing.find(
         (b) =>
@@ -348,14 +349,14 @@ export const updateBookingStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     if (process.env.GOOGLE_SHEET_ID) {
       const { getRange, updateRange } = await import("./sheets.server");
-      const rows = await getRange("Bookings!A2:N");
+      const rows = await getRange("Bookings!A2:O");
       const existing = rowsToBookings(rows);
       const booking = existing.find((item) => item.BookingID === data.bookingId);
       if (!booking) throw new Error("Booking not found.");
 
       const nextStatus = data.status === "Unknown" ? "" : data.status;
       const row = bookingToSheetRow(booking, nextStatus);
-      await updateRange(`Bookings!A${booking._row}:N${booking._row}`, row);
+      await updateRange(`Bookings!A${booking._row}:O${booking._row}`, row);
       return { ok: true };
     }
 
