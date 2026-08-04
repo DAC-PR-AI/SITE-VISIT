@@ -10,6 +10,29 @@ export const DEPARTMENTS = [
 
 export type Department = (typeof DEPARTMENTS)[number] | string;
 
+export function normalizeDepartmentName(dept?: string): string {
+  const raw = (dept ?? "").trim();
+  if (!raw) return "";
+
+  const normalized = raw.toLowerCase();
+  const aliases: Record<string, string> = {
+    sales: "Sales",
+    sale: "Sales",
+    "sales team": "Sales",
+    marketing: "Marketing",
+    operations: "Operations",
+    finance: "Finance",
+    hr: "HR",
+    humanresources: "HR",
+    management: "Management",
+    crm: "CRM",
+    customerrelationshipmanagement: "CRM",
+  };
+
+  if (aliases[normalized]) return aliases[normalized];
+  return DEPARTMENTS.includes(raw as (typeof DEPARTMENTS)[number]) ? raw : "Other";
+}
+
 // Static Tailwind classes so JIT keeps them. Keyed by lowercase dept.
 const MAP: Record<
   string,

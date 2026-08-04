@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Booking } from "@/lib/booking-types";
 import { normalizeVisitStatus, toMinutes } from "@/lib/booking-types";
-import { deptColors } from "@/lib/departments";
+import { DEPARTMENTS, deptColors, normalizeDepartmentName } from "@/lib/departments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
@@ -53,9 +53,17 @@ export function TimelineView({
   }, [projectNames, bookings]);
 
   const legendDepartments = useMemo(() => {
-    const fromSheet = (departments ?? []).map((d) => d.trim()).filter(Boolean);
-    if (fromSheet.length) return fromSheet;
-    return Array.from(new Set(bookings.map((b) => b.Department).filter(Boolean))).sort();
+    const fromSheet = (departments ?? [])
+      .map(normalizeDepartmentName)
+      .filter((d): d is string => Boolean(d) && d !== "Other");
+    const fromBookings = Array.from(
+      new Set(bookings.map((b) => normalizeDepartmentName(b.Department)).filter((d): d is string => Boolean(d) && d !== "Other")),
+    );
+
+    const visible = Array.from(new Set([...fromSheet, ...fromBookings]));
+    const ordered = visible.filter((d) => DEPARTMENTS.includes(d as (typeof DEPARTMENTS)[number]));
+
+    return ordered.length ? ordered : [...DEPARTMENTS];
   }, [departments, bookings]);
 
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
@@ -147,7 +155,8 @@ export function TimelineView({
                     const end = toMinutes(b.EndTime) - START_HOUR * 60;
                     const left = Math.max(0, (start / totalMinutes) * 100);
                     const width = Math.max(2, ((Math.min(end, totalMinutes) - Math.max(start, 0)) / totalMinutes) * 100);
-                    const c = deptColors(b.Department);
+                    const departmentLabel = normalizeDepartmentName(b.Department);
+                    const c = deptColors(departmentLabel);
                     const status = normalizeVisitStatus(statusByBookingId[b.BookingID] ?? b.VisitStatus);
                     const statusClasses =
                       status === "Yes"
@@ -175,7 +184,7 @@ export function TimelineView({
                               {b.CustomerName || b.EmployeeName}
                             </p>
                             <p className="text-[9px] text-slate-700 truncate">
-                              {b.StartTime}–{b.EndTime} · {b.Department}
+                              {b.StartTime}–{b.EndTime} · {departmentLabel || "Other"}
                             </p>
                           </div>
                         </button>

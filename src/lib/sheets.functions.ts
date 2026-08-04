@@ -9,8 +9,15 @@ import {
   updateInMemoryBooking,
   deleteInMemoryBooking,
 } from "./mock-data";
+import { DEPARTMENTS, normalizeDepartmentName } from "./departments";
 
 const BOOKING_COLS = 13; // A..M
+
+function isQuotaExceededError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const body = typeof error === "object" && error && "body" in error ? String((error as { body?: unknown }).body ?? "") : "";
+  return /429|quota exceeded|resource_exhausted|too many requests|rate limit/i.test(`${message}\n${body}`);
+}
 
 function pad(row: string[], n: number): string[] {
   const out = row.slice(0, n);
@@ -75,9 +82,12 @@ export const checkSheetConnection = createServerFn({ method: "GET" }).handler(as
     };
   } catch (err: unknown) {
     const message = (err as Error)?.message || "Unknown error";
+    const reason = isQuotaExceededError(err)
+      ? "Google Sheets is temporarily rate-limited. Using demo data for now."
+      : `Google Sheet Connection Failed (${message})`;
     return {
       configured: false,
-      reason: `Google Sheet Connection Failed (${message})`,
+      reason,
       sheetId: `${sheetIdVal.slice(0, 8)}...`,
     };
   }
@@ -93,6 +103,10 @@ export const listProjects = createServerFn({ method: "GET" }).handler(async () =
       .filter((r) => r[0] || r[1])
       .map<Project>((r) => ({ ProjectID: r[0] ?? "", ProjectName: r[1] ?? "" }));
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      console.warn("[sheets] Google Sheets quota exceeded while listing projects — using mock fallback.");
+      return MOCK_PROJECTS;
+    }
     console.error("[sheets] Failed to list projects from Google Sheets:", err);
     throw err;
   }
@@ -112,6 +126,10 @@ export const listUnits = createServerFn({ method: "GET" }).handler(async () => {
         Availability: r[2] ?? "",
       }));
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      console.warn("[sheets] Google Sheets quota exceeded while listing units — using mock fallback.");
+      return MOCK_UNITS;
+    }
     console.error("[sheets] Failed to list units from Google Sheets:", err);
     throw err;
   }
@@ -125,6 +143,10 @@ export const listBookings = createServerFn({ method: "GET" }).handler(async () =
     if (!rows) return [];
     return rowsToBookings(rows);
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      console.warn("[sheets] Google Sheets quota exceeded while listing bookings — using mock fallback.");
+      return getInMemoryBookings();
+    }
     console.error("[sheets] Failed to list bookings from Google Sheets:", err);
     throw err;
   }
@@ -134,12 +156,17 @@ export const listDepartments = createServerFn({ method: "GET" }).handler(async (
   if (!process.env.GOOGLE_SHEET_ID) return MOCK_DEPARTMENTS;
   try {
     const { getRange } = await import("./sheets.server");
-    const { DEPARTMENTS } = await import("./departments");
     const rows = await getRange("Departments!A2:A");
     if (!rows || rows.length === 0) return [...DEPARTMENTS];
-    const names = rows.map((r) => (r[0] ?? "").trim()).filter(Boolean);
+    const names = rows
+      .map((r) => normalizeDepartmentName(r[0] ?? ""))
+      .filter((name): name is string => Boolean(name) && name !== "Other");
     return names.length ? Array.from(new Set(names)) : [...DEPARTMENTS];
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      console.warn("[sheets] Google Sheets quota exceeded while listing departments — using fallback departments.");
+      return [...MOCK_DEPARTMENTS];
+    }
     console.error("[sheets] Failed to list departments from Google Sheets:", err);
     const { DEPARTMENTS } = await import("./departments");
     return [...DEPARTMENTS];
@@ -300,4 +327,4 @@ export const setupSheets = createServerFn({ method: "POST" }).handler(async () =
   }
   const { ensureTabs } = await import("./sheets.server");
   return ensureTabs();
-});
+});
