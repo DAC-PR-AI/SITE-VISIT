@@ -31,6 +31,19 @@ function formatPrivateKey(key: string): string {
 }
 
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+const RANGE_CACHE = new Map<string, { value: string[][]; expiresAt: number }>();
+const RANGE_CACHE_TTL_MS = 15_000;
+
+function getCacheKey(range: string): string {
+  const sheetIdVal = sheetId();
+  return `${sheetIdVal}:${range}`;
+}
+
+function isQuotaExceededError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const body = typeof error === "object" && error && "body" in error ? String((error as { body?: unknown }).body ?? "") : "";
+  return /429|quota exceeded|resource_exhausted|too many requests|rate limit/i.test(`${message}\n${body}`);
+}
 
 async function getServiceAccountToken(clientEmail: string, privateKey: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -144,16 +157,27 @@ async function handle(res: Response) {
 }
 
 export async function getRange(range: string): Promise<string[][]> {
-  const config = await getApiConfig();
-  const rawUrl = `${config.baseUrl}/values/${encodeURIComponent(range)}`;
-  const url = appendQueryParam(rawUrl, config.queryParams);
+  const cacheKey = getCacheKey(range);
+  const cached = RANGE_CACHE.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
+    const config = await getApiConfig();
+    const rawUrl = `${config.baseUrl}/values/${encodeURIComponent(range)}`;
+    const url = appendQueryParam(rawUrl, config.queryParams);
     const data = await handle(await fetch(url, { headers: config.headers }));
-    return (data.values ?? []) as string[][];
+    const rows = (data.values ?? []) as string[][];
+    RANGE_CACHE.set(cacheKey, { value: rows, expiresAt: Date.now() + RANGE_CACHE_TTL_MS });
+    return rows;
   } catch (e) {
     const err = e as Error & { status?: number; body?: string };
-    if (err.status === 400 && /Unable to parse range/i.test(err.body || "")) {
-      console.warn(`[sheets] Missing tab for range "${range}" — returning empty.`);
+    const body = err.body || "";
+    const isMissingSheet = err.status === 400 && /Unable to parse range|not found|does not exist/i.test(body);
+    const isMissingEntity = err.status === 404 || /Requested entity was not found/i.test(body);
+    if (isMissingSheet || isMissingEntity) {
+      console.warn(`[sheets] Missing tab/range for "${range}" — returning empty.`);
       return [];
     }
     throw e;
@@ -211,6 +235,7 @@ const TABS: Record<string, string[]> = {
     "Purpose",
     "Remarks",
     "CreatedAt",
+    "Hover",
   ],
 };
 

@@ -3,9 +3,30 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { listBookings, listDepartments, listProjects } from "@/lib/sheets.functions";
 import { TimelineView } from "@/components/timeline-view";
 
-const bookingsQO = queryOptions({ queryKey: ["bookings"], queryFn: () => listBookings() });
-const projectsQO = queryOptions({ queryKey: ["projects"], queryFn: () => listProjects() });
-const departmentsQO = queryOptions({ queryKey: ["departments"], queryFn: () => listDepartments() });
+const bookingsQO = queryOptions({
+  queryKey: ["bookings"],
+  queryFn: () => listBookings(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const projectsQO = queryOptions({
+  queryKey: ["projects"],
+  queryFn: () => listProjects(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const departmentsQO = queryOptions({
+  queryKey: ["departments"],
+  queryFn: () => listDepartments(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
 
 export const Route = createFileRoute("/timeline")({
   head: () => ({

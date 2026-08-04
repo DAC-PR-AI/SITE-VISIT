@@ -20,7 +20,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: conn } = useQuery({
     queryKey: ["sheet-connection"],
     queryFn: () => checkConn(),
-    staleTime: 60000,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   return (

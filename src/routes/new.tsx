@@ -18,10 +18,38 @@ import { AdminCodeDialog, getStoredAdminCode } from "@/components/admin-code-dia
 
 const searchSchema = z.object({ edit: z.string().optional() });
 
-const bookingsQO = queryOptions({ queryKey: ["bookings"], queryFn: () => listBookings() });
-const projectsQO = queryOptions({ queryKey: ["projects"], queryFn: () => listProjects() });
-const unitsQO = queryOptions({ queryKey: ["units"], queryFn: () => listUnits() });
-const departmentsQO = queryOptions({ queryKey: ["departments"], queryFn: () => listDepartments() });
+const bookingsQO = queryOptions({
+  queryKey: ["bookings"],
+  queryFn: () => listBookings(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const projectsQO = queryOptions({
+  queryKey: ["projects"],
+  queryFn: () => listProjects(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const unitsQO = queryOptions({
+  queryKey: ["units"],
+  queryFn: () => listUnits(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const departmentsQO = queryOptions({
+  queryKey: ["departments"],
+  queryFn: () => listDepartments(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
 
 export const Route = createFileRoute("/new")({
   head: () => ({
@@ -71,6 +99,10 @@ function todayISO() {
 }
 
 type FormState = z.input<typeof formSchema> & { TimeSlot: string };
+
+function normalizeValue(value?: string | null) {
+  return (value ?? "").trim().toLowerCase();
+}
 
 function NewBookingPage() {
   const { edit } = Route.useSearch();
@@ -126,7 +158,31 @@ function NewBookingPage() {
     [projects],
   );
   const selectedProjectId = projectByName.get(form.ProjectName);
-  const projectUnits = units.filter((u) => u.ProjectID === selectedProjectId);
+  const projectUnits = useMemo(() => {
+    if (!form.ProjectName) return [];
+
+    const candidates = [selectedProjectId, form.ProjectName]
+      .filter(Boolean)
+      .map((value) => normalizeValue(value));
+
+    const fromUnits = units.filter((u) => candidates.includes(normalizeValue(u.ProjectID)));
+    const fromBookings = bookings
+      .filter((booking) => booking.ProjectName === form.ProjectName && booking.UnitNumber)
+      .map((booking) => ({
+        ProjectID: booking.ProjectName,
+        UnitNumber: booking.UnitNumber,
+        Availability: "Booked",
+      }));
+
+    const merged = [...fromUnits, ...fromBookings];
+    const seen = new Set<string>();
+    return merged.filter((unit) => {
+      const key = normalizeValue(unit.UnitNumber);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [bookings, form.ProjectName, selectedProjectId, units]);
 
   const create = useServerFn(createBooking);
   const update = useServerFn(updateBooking);

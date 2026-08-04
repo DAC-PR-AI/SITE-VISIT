@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
-import type { Booking } from "@/lib/booking-types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import type { Booking, VisitStatusValue } from "@/lib/booking-types";
 import { normalizeVisitStatus, toMinutes } from "@/lib/booking-types";
 import { DEPARTMENTS, deptColors, normalizeDepartmentName } from "@/lib/departments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { toast } from "sonner";
 import { BookingDetailDialog } from "./booking-detail-dialog";
+import { updateBookingStatus } from "@/lib/sheets.functions";
 
 const START_HOUR = 8;
 const END_HOUR = 20;
@@ -44,6 +48,16 @@ export function TimelineView({
   const [selected, setSelected] = useState<Booking | null>(null);
   const [promptBookingId, setPromptBookingId] = useState<string | null>(null);
   const [statusByBookingId, setStatusByBookingId] = useState<Record<string, "Yes" | "No" | "Unknown">>({});
+  const queryClient = useQueryClient();
+  const saveStatus = useServerFn(updateBookingStatus);
+  const statusMutation = useMutation({
+    mutationFn: async ({ bookingId, status }: { bookingId: string; status: VisitStatusValue }) =>
+      saveStatus({ bookingId, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+    onError: (error: Error) => toast.error(error.message || "Unable to save booking status."),
+  });
 
   const dayBookings = useMemo(() => bookings.filter((b) => b.VisitDate === date), [bookings, date]);
 
@@ -198,8 +212,10 @@ export function TimelineView({
                                 className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: "Yes" }));
-                                  onVisitStatusChange?.(b.BookingID, "Yes");
+                                  const status: VisitStatusValue = "Yes";
+                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: status }));
+                                  onVisitStatusChange?.(b.BookingID, status);
+                                  statusMutation.mutate({ bookingId: b.BookingID, status });
                                   setPromptBookingId(null);
                                 }}
                               >
@@ -212,8 +228,10 @@ export function TimelineView({
                                 className="flex-1"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: "No" }));
-                                  onVisitStatusChange?.(b.BookingID, "No");
+                                  const status: VisitStatusValue = "No";
+                                  setStatusByBookingId((current) => ({ ...current, [b.BookingID]: status }));
+                                  onVisitStatusChange?.(b.BookingID, status);
+                                  statusMutation.mutate({ bookingId: b.BookingID, status });
                                   setPromptBookingId(null);
                                 }}
                               >

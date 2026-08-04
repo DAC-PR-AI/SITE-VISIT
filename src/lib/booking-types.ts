@@ -27,6 +27,8 @@ export interface Booking {
   _row?: number; // sheet row for edit/delete
 }
 
+export type VisitStatusValue = "Yes" | "No" | "Unknown";
+
 export interface BookingInput {
   EmployeeName: string;
   Department: string;

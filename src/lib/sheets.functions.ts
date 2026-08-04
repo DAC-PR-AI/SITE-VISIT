@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { Booking, Project, Unit, BookingInput } from "./booking-types";
+import type { Booking, Project, Unit, BookingInput, VisitStatusValue } from "./booking-types";
 import {
   MOCK_PROJECTS,
   MOCK_UNITS,
@@ -11,7 +11,7 @@ import {
 } from "./mock-data";
 import { DEPARTMENTS, normalizeDepartmentName } from "./departments";
 
-const BOOKING_COLS = 13; // A..M
+const BOOKING_COLS = 14; // A..N
 
 function isQuotaExceededError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -44,10 +44,30 @@ function rowsToBookings(rows: string[][]): Booking[] {
         Purpose: p[10],
         Remarks: p[11],
         CreatedAt: p[12],
+        VisitStatus: p[13] || undefined,
         _row: i + 2, // header is row 1
       } as Booking;
     })
     .filter(Boolean) as Booking[];
+}
+
+function bookingToSheetRow(booking: Booking, visitStatus?: string) {
+  return [
+    booking.BookingID,
+    booking.EmployeeName,
+    booking.Department,
+    booking.CustomerName,
+    booking.MobileNumber,
+    booking.ProjectName,
+    booking.UnitNumber,
+    booking.VisitDate,
+    booking.StartTime,
+    booking.EndTime,
+    booking.Purpose,
+    booking.Remarks,
+    booking.CreatedAt,
+    visitStatus ?? booking.VisitStatus ?? "",
+  ] as (string | number)[];
 }
 
 export const checkSheetConnection = createServerFn({ method: "GET" }).handler(async () => {
@@ -198,7 +218,7 @@ export const createBooking = createServerFn({ method: "POST" })
 
       const id = `BK${Date.now().toString(36).toUpperCase()}`;
       const createdAt = new Date().toISOString();
-      await appendRow("Bookings!A:M", [
+      await appendRow("Bookings!A:N", [
         id,
         data.EmployeeName,
         data.Department,
@@ -212,6 +232,7 @@ export const createBooking = createServerFn({ method: "POST" })
         data.Purpose,
         data.Remarks,
         createdAt,
+        "",
       ]);
       return { id };
     }
@@ -270,7 +291,7 @@ export const updateBooking = createServerFn({ method: "POST" })
 
     if (process.env.GOOGLE_SHEET_ID) {
       const { getRange, updateRange } = await import("./sheets.server");
-      const rows = await getRange("Bookings!A2:M");
+      const rows = await getRange("Bookings!A2:N");
       const existing = rowsToBookings(rows);
       const conflict = existing.find(
         (b) =>
@@ -286,7 +307,7 @@ export const updateBooking = createServerFn({ method: "POST" })
         );
       }
       const orig = existing.find((b) => b.BookingID === data.BookingID);
-      await updateRange(`Bookings!A${data._row}:M${data._row}`, [
+      await updateRange(`Bookings!A${data._row}:N${data._row}`, [
         data.BookingID,
         data.EmployeeName,
         data.Department,
@@ -300,6 +321,7 @@ export const updateBooking = createServerFn({ method: "POST" })
         data.Purpose,
         data.Remarks,
         orig?.CreatedAt || new Date().toISOString(),
+        data.VisitStatus ?? orig?.VisitStatus ?? "",
       ]);
       return { ok: true };
     }
@@ -314,10 +336,40 @@ export const deleteBooking = createServerFn({ method: "POST" })
     assertAdmin(data.adminCode);
     if (process.env.GOOGLE_SHEET_ID) {
       const { clearRange } = await import("./sheets.server");
-      await clearRange(`Bookings!A${data._row}:M${data._row}`);
+      await clearRange(`Bookings!A${data._row}:N${data._row}`);
       return { ok: true };
     }
     deleteInMemoryBooking(data._row);
+    return { ok: true };
+  });
+
+export const updateBookingStatus = createServerFn({ method: "POST" })
+  .inputValidator((data: { bookingId: string; status: VisitStatusValue }) => data)
+  .handler(async ({ data }) => {
+    if (process.env.GOOGLE_SHEET_ID) {
+      const { getRange, updateRange } = await import("./sheets.server");
+      const rows = await getRange("Bookings!A2:N");
+      const existing = rowsToBookings(rows);
+      const booking = existing.find((item) => item.BookingID === data.bookingId);
+      if (!booking) throw new Error("Booking not found.");
+
+      const nextStatus = data.status === "Unknown" ? "" : data.status;
+      const row = bookingToSheetRow(booking, nextStatus);
+      await updateRange(`Bookings!A${booking._row}:N${booking._row}`, row);
+      return { ok: true };
+    }
+
+    const existing = getInMemoryBookings();
+    const booking = existing.find((item) => item.BookingID === data.bookingId);
+    if (!booking) throw new Error("Booking not found.");
+
+    const nextStatus = data.status === "Unknown" ? "" : data.status;
+    updateInMemoryBooking({
+      ...booking,
+      VisitStatus: nextStatus,
+      _row: booking._row ?? 0,
+      BookingID: booking.BookingID,
+    } as BookingInput & { BookingID: string; _row: number });
     return { ok: true };
   });
 

@@ -30,10 +30,38 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const bookingsQO = queryOptions({ queryKey: ["bookings"], queryFn: () => listBookings() });
-const projectsQO = queryOptions({ queryKey: ["projects"], queryFn: () => listProjects() });
-const unitsQO = queryOptions({ queryKey: ["units"], queryFn: () => listUnits() });
-const departmentsQO = queryOptions({ queryKey: ["departments"], queryFn: () => listDepartments() });
+const bookingsQO = queryOptions({
+  queryKey: ["bookings"],
+  queryFn: () => listBookings(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const projectsQO = queryOptions({
+  queryKey: ["projects"],
+  queryFn: () => listProjects(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const unitsQO = queryOptions({
+  queryKey: ["units"],
+  queryFn: () => listUnits(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const departmentsQO = queryOptions({
+  queryKey: ["departments"],
+  queryFn: () => listDepartments(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
 
 function todayISO() {
   const d = new Date();

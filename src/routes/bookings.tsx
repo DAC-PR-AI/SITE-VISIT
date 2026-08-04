@@ -10,12 +10,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Download } from "lucide-react";
 import { BookingDetailDialog } from "@/components/booking-detail-dialog";
-import type { Booking } from "@/lib/booking-types";
+import { normalizeVisitStatus, type Booking } from "@/lib/booking-types";
 import * as XLSX from "xlsx";
 
-const bookingsQO = queryOptions({ queryKey: ["bookings"], queryFn: () => listBookings() });
-const projectsQO = queryOptions({ queryKey: ["projects"], queryFn: () => listProjects() });
-const departmentsQO = queryOptions({ queryKey: ["departments"], queryFn: () => listDepartments() });
+const bookingsQO = queryOptions({
+  queryKey: ["bookings"],
+  queryFn: () => listBookings(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const projectsQO = queryOptions({
+  queryKey: ["projects"],
+  queryFn: () => listProjects(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
+const departmentsQO = queryOptions({
+  queryKey: ["departments"],
+  queryFn: () => listDepartments(),
+  staleTime: 60_000,
+  gcTime: 10 * 60_000,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+});
 
 export const Route = createFileRoute("/bookings")({
   head: () => ({
@@ -85,6 +106,7 @@ function BookingsPage() {
       End: b.EndTime,
       Purpose: b.Purpose,
       Remarks: b.Remarks,
+      Hover: normalizeVisitStatus(b.VisitStatus) === "Unknown" ? "" : normalizeVisitStatus(b.VisitStatus),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
