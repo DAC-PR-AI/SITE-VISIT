@@ -42,6 +42,13 @@ export const Route = createFileRoute("/new")({
   component: NewBookingPage,
 });
 
+const TIME_SLOT_OPTIONS = [
+  { label: "10:00 – 12:00", value: "10:00-12:00", startTime: "10:00", endTime: "12:00" },
+  { label: "12:00 – 14:00", value: "12:00-14:00", startTime: "12:00", endTime: "14:00" },
+  { label: "14:00 – 16:00", value: "14:00-16:00", startTime: "14:00", endTime: "16:00" },
+  { label: "16:00 – 18:00", value: "16:00-18:00", startTime: "16:00", endTime: "18:00" },
+] as const;
+
 const formSchema = z
   .object({
     EmployeeName: z.string().trim().min(2, "Employee name required").max(80),
@@ -63,7 +70,7 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-type FormState = z.input<typeof formSchema>;
+type FormState = z.input<typeof formSchema> & { TimeSlot: string };
 
 function NewBookingPage() {
   const { edit } = Route.useSearch();
@@ -85,9 +92,10 @@ function NewBookingPage() {
     UnitNumber: "",
     VisitDate: todayISO(),
     StartTime: "10:00",
-    EndTime: "11:00",
+    EndTime: "12:00",
     Purpose: "",
     Remarks: "",
+    TimeSlot: "10:00-12:00",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gateOpen, setGateOpen] = useState(false);
@@ -95,6 +103,7 @@ function NewBookingPage() {
 
   useEffect(() => {
     if (editing) {
+      const slotOption = TIME_SLOT_OPTIONS.find((slot) => slot.startTime === editing.StartTime && slot.endTime === editing.EndTime);
       setForm({
         EmployeeName: editing.EmployeeName,
         Department: editing.Department,
@@ -107,6 +116,7 @@ function NewBookingPage() {
         EndTime: editing.EndTime,
         Purpose: editing.Purpose,
         Remarks: editing.Remarks,
+        TimeSlot: slotOption?.value ?? "10:00-12:00",
       });
     }
   }, [editing]);
@@ -198,6 +208,17 @@ function NewBookingPage() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  const setTimeSlot = (value: string) => {
+    const slot = TIME_SLOT_OPTIONS.find((option) => option.value === value);
+    if (!slot) return;
+    setForm((f) => ({
+      ...f,
+      TimeSlot: slot.value,
+      StartTime: slot.startTime,
+      EndTime: slot.endTime,
+    }));
+  };
+
   const c = deptColors(form.Department);
 
   return (
@@ -281,14 +302,18 @@ function NewBookingPage() {
               <Input type="date" value={form.VisitDate} onChange={(e) => set("VisitDate", e.target.value)} min={todayISO()} />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Start" error={errors.StartTime}>
-                <Input type="time" value={form.StartTime} onChange={(e) => set("StartTime", e.target.value)} />
-              </Field>
-              <Field label="End" error={errors.EndTime}>
-                <Input type="time" value={form.EndTime} onChange={(e) => set("EndTime", e.target.value)} />
-              </Field>
-            </div>
+            <Field label="Time Slot" error={errors.StartTime} className="md:col-span-2">
+              <Select value={form.TimeSlot} onValueChange={setTimeSlot}>
+                <SelectTrigger><SelectValue placeholder="Select visit slot" /></SelectTrigger>
+                <SelectContent>
+                  {TIME_SLOT_OPTIONS.map((slot) => (
+                    <SelectItem key={slot.value} value={slot.value}>
+                      {slot.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
             <Field label="Purpose" error={errors.Purpose} className="md:col-span-2">
               <Input value={form.Purpose} onChange={(e) => set("Purpose", e.target.value)} placeholder="Property viewing, negotiation, final walkthrough…" />

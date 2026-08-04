@@ -23,6 +23,7 @@ export interface Booking {
   Purpose: string;
   Remarks: string;
   CreatedAt: string;
+  VisitStatus?: string;
   _row?: number; // sheet row for edit/delete
 }
 
@@ -38,6 +39,7 @@ export interface BookingInput {
   EndTime: string;
   Purpose: string;
   Remarks: string;
+  VisitStatus?: string;
 }
 
 export function toMinutes(hhmm: string): number {
@@ -47,4 +49,12 @@ export function toMinutes(hhmm: string): number {
 
 export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
   return toMinutes(aStart) < toMinutes(bEnd) && toMinutes(bStart) < toMinutes(aEnd);
+}
+
+export function normalizeVisitStatus(value?: string | null): "Yes" | "No" | "Unknown" {
+  if (!value) return "Unknown";
+  const normalized = value.trim().toLowerCase();
+  if (["yes", "y", "confirmed", "completed", "done", "true", "1"].includes(normalized)) return "Yes";
+  if (["no", "n", "pending", "not completed", "false", "0"].includes(normalized)) return "No";
+  return "Unknown";
 }

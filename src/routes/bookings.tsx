@@ -42,7 +42,14 @@ function BookingsPage() {
   const [dept, setDept] = useState<string>("all");
   const [project, setProject] = useState<string>("all");
   const [date, setDate] = useState("");
+  const [employee, setEmployee] = useState<string>("all");
+  const [customer, setCustomer] = useState("");
   const [selected, setSelected] = useState<Booking | null>(null);
+
+  const employeeOptions = useMemo(
+    () => Array.from(new Set(bookings.map((b) => b.EmployeeName).filter(Boolean))).sort(),
+    [bookings],
+  );
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -50,13 +57,19 @@ function BookingsPage() {
       if (dept !== "all" && (b.Department || "").toLowerCase() !== dept.toLowerCase()) return false;
       if (project !== "all" && b.ProjectName !== project) return false;
       if (date && b.VisitDate !== date) return false;
+      if (employee !== "all" && (b.EmployeeName || "").toLowerCase() !== employee.toLowerCase()) return false;
+      if (customer.trim()) {
+        const customerTerm = customer.trim().toLowerCase();
+        const hay = `${b.CustomerName} ${b.MobileNumber}`.toLowerCase();
+        if (!hay.includes(customerTerm)) return false;
+      }
       if (term) {
         const hay = `${b.CustomerName} ${b.EmployeeName} ${b.MobileNumber} ${b.ProjectName} ${b.UnitNumber} ${b.BookingID} ${b.Purpose}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
       return true;
     });
-  }, [bookings, q, dept, project, date]);
+  }, [bookings, q, dept, project, date, employee, customer]);
 
   const exportXlsx = () => {
     const rows = filtered.map((b) => ({
@@ -94,7 +107,7 @@ function BookingsPage() {
       </header>
 
       <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_200px_160px]">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_180px_auto]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -118,7 +131,32 @@ function BookingsPage() {
               {projects.map((p) => (<SelectItem key={p.ProjectID || p.ProjectName} value={p.ProjectName}>{p.ProjectName}</SelectItem>))}
             </SelectContent>
           </Select>
+          <Select value={employee} onValueChange={setEmployee}>
+            <SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All employees</SelectItem>
+              {employeeOptions.map((name) => (<SelectItem key={name} value={name}>{name}</SelectItem>))}
+            </SelectContent>
+          </Select>
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Customer name" />
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setQ("");
+              setDept("all");
+              setProject("all");
+              setDate("");
+              setEmployee("all");
+              setCustomer("");
+            }}
+          >
+            Clear filters
+          </Button>
         </div>
       </Card>
 

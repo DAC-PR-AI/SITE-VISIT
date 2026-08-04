@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
-import { listBookings, listProjects, listUnits } from "@/lib/sheets.functions";
+import { listBookings, listDepartments, listProjects, listUnits } from "@/lib/sheets.functions";
 import { deptColors } from "@/lib/departments";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CalendarClock, Users, Building2, TrendingUp, Plus, ArrowRight } from "lucide-react";
 import { TimelineView } from "@/components/timeline-view";
+import type { Booking } from "@/lib/booking-types";
+import { toMinutes } from "@/lib/booking-types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,6 +24,7 @@ export const Route = createFileRoute("/")({
     context.queryClient.ensureQueryData(bookingsQO);
     context.queryClient.ensureQueryData(projectsQO);
     context.queryClient.ensureQueryData(unitsQO);
+    context.queryClient.ensureQueryData(departmentsQO);
   },
   component: Dashboard,
 });
@@ -29,6 +32,7 @@ export const Route = createFileRoute("/")({
 const bookingsQO = queryOptions({ queryKey: ["bookings"], queryFn: () => listBookings() });
 const projectsQO = queryOptions({ queryKey: ["projects"], queryFn: () => listProjects() });
 const unitsQO = queryOptions({ queryKey: ["units"], queryFn: () => listUnits() });
+const departmentsQO = queryOptions({ queryKey: ["departments"], queryFn: () => listDepartments() });
 
 function todayISO() {
   const d = new Date();
@@ -39,17 +43,31 @@ function Dashboard() {
   const bookings = useSuspenseQuery(bookingsQO).data;
   const projects = useSuspenseQuery(projectsQO).data;
   const units = useSuspenseQuery(unitsQO).data;
+  const departments = useSuspenseQuery(departmentsQO).data;
 
   const today = todayISO();
   const todays = bookings.filter((b) => b.VisitDate === today);
-  const upcoming = bookings.filter((b) => b.VisitDate >= today).length;
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const upcoming = todays.filter((b) => toMinutes(b.StartTime) > currentMinutes).length;
+  const completed = todays.filter((b) => toMinutes(b.EndTime) <= currentMinutes).length;
+  const notCompleted = todays.filter((b) => toMinutes(b.EndTime) > currentMinutes).length;
   const uniqueEmployees = new Set(bookings.map((b) => b.EmployeeName)).size;
 
-  const perDept = bookings.reduce<Record<string, number>>((acc, b) => {
-    const k = b.Department || "Other";
-    acc[k] = (acc[k] ?? 0) + 1;
-    return acc;
-  }, {});
+  const departmentBreakdown = departments.length
+    ? departments.map((dept) => ({
+        dept,
+        count: bookings.filter((b) => (b.Department || "Other").toLowerCase() === dept.toLowerCase()).length,
+      }))
+    : Object.entries(
+        bookings.reduce<Record<string, number>>((acc, b) => {
+          const k = b.Department || "Other";
+          acc[k] = (acc[k] ?? 0) + 1;
+          return acc;
+        }, {}),
+      ).map(([dept, count]) => ({ dept, count }));
+
+  const projectSummaries = projects.map((project) => getProjectSnapshot(project.ProjectName, bookings, today));
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8 md:py-10 space-y-8">
@@ -75,12 +93,60 @@ function Dashboard() {
       </header>
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard icon={CalendarClock} label="Today's Visits" value={todays.length} accent="bg-blue-500" />
-        <KpiCard icon={TrendingUp} label="Upcoming" value={upcoming} accent="bg-emerald-500" />
+        <KpiCard icon={TrendingUp} label="Upcoming Visits" value={upcoming} accent="bg-emerald-500" />
+        <KpiCard icon={CalendarClock} label="Completed Visits" value={completed} accent="bg-violet-500" />
+        <KpiCard icon={CalendarClock} label="Not Completed Visits" value={notCompleted} accent="bg-amber-500" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard icon={Building2} label="Active Projects" value={projects.length} accent="bg-orange-500" />
         <KpiCard icon={Users} label="Employees Booking" value={uniqueEmployees} accent="bg-purple-500" />
       </div>
+
+      {/* Project pulse */}
+      <section className="space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="font-display text-xl font-semibold">Project Pulse</h2>
+            <p className="text-sm text-muted-foreground">At-a-glance status for each project, including today’s visit volume and the next upcoming visit</p>
+          </div>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-3">
+          {projectSummaries.map((summary, index) => {
+            const badgeClass =
+              summary.status === "Busy"
+                ? "bg-orange-100 text-orange-700"
+                : summary.status === "No Visits Today"
+                  ? "bg-slate-100 text-slate-700"
+                  : "bg-emerald-100 text-emerald-700";
+            return (
+              <Card key={`${summary.projectName}-${index}`} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display text-lg font-semibold">{summary.projectName}</p>
+                    <p className="text-sm text-muted-foreground">Today’s visits: {summary.todayCount}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${badgeClass}`}>
+                    {summary.status}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Visit count</p>
+                    <p className="text-2xl font-semibold">{summary.todayCount}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Next visit</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{summary.nextVisit}</p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Timeline preview */}
       <section className="space-y-3">
@@ -96,7 +162,7 @@ function Dashboard() {
             </Link>
           </Button>
         </div>
-        <TimelineView bookings={bookings} projectNames={projects.map((p) => p.ProjectName)} date={today} />
+        <TimelineView bookings={bookings} projectNames={projects.map((p) => p.ProjectName)} departments={departments} date={today} />
       </section>
 
       {/* Split: Department breakdown + Recent */}
@@ -105,11 +171,11 @@ function Dashboard() {
           <h3 className="font-display text-lg font-semibold">By Department</h3>
           <p className="text-sm text-muted-foreground mb-4">All-time bookings distribution</p>
           <div className="space-y-3">
-            {Object.entries(perDept)
-              .sort((a, b) => b[1] - a[1])
-              .map(([dept, count]) => {
+            {departmentBreakdown
+              .sort((a, b) => b.count - a.count)
+              .map(({ dept, count }) => {
                 const c = deptColors(dept);
-                const max = Math.max(...Object.values(perDept), 1);
+                const max = Math.max(...departmentBreakdown.map((item) => item.count), 1);
                 return (
                   <div key={dept}>
                     <div className="flex items-center justify-between text-sm">
@@ -125,7 +191,7 @@ function Dashboard() {
                   </div>
                 );
               })}
-            {Object.keys(perDept).length === 0 && (
+            {departmentBreakdown.length === 0 && (
               <p className="text-sm text-muted-foreground">No bookings yet.</p>
             )}
           </div>
@@ -168,6 +234,28 @@ function Dashboard() {
       </section>
     </div>
   );
+}
+
+function getProjectSnapshot(projectName: string, bookings: Booking[], today: string) {
+  const projectBookings = bookings.filter((b) => b.ProjectName === projectName);
+  const todays = projectBookings.filter((b) => b.VisitDate === today);
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const busyNow = todays.some((b) => {
+    const start = toMinutes(b.StartTime);
+    const end = toMinutes(b.EndTime);
+    return start <= currentMinutes && currentMinutes < end;
+  });
+  const upcoming = projectBookings
+    .filter((b) => b.VisitDate > today || (b.VisitDate === today && toMinutes(b.StartTime) >= currentMinutes))
+    .sort((a, b) => `${a.VisitDate}${a.StartTime}`.localeCompare(`${b.VisitDate}${b.StartTime}`))[0];
+
+  return {
+    projectName,
+    todayCount: todays.length,
+    nextVisit: upcoming ? `${upcoming.VisitDate} · ${upcoming.StartTime}` : "No visits scheduled",
+    status: todays.length === 0 ? "No Visits Today" : busyNow ? "Busy" : "Free Now",
+  };
 }
 
 function KpiCard({ icon: Icon, label, value, accent }: { icon: typeof CalendarClock; label: string; value: number; accent: string }) {

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Booking } from "@/lib/booking-types";
-import { toMinutes } from "@/lib/booking-types";
-import { deptColors, DEPARTMENTS } from "@/lib/departments";
+import { normalizeVisitStatus, toMinutes } from "@/lib/booking-types";
+import { deptColors } from "@/lib/departments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
@@ -30,10 +30,12 @@ function formatDay(iso: string): string {
 export function TimelineView({
   bookings,
   projectNames,
+  departments,
   date: initialDate,
 }: {
   bookings: Booking[];
   projectNames: string[];
+  departments?: string[];
   date?: string;
 }) {
   const [date, setDate] = useState(initialDate || todayISO());
@@ -45,6 +47,12 @@ export function TimelineView({
     const projects = projectNames.length ? projectNames : Array.from(new Set(bookings.map((b) => b.ProjectName))).filter(Boolean);
     return projects;
   }, [projectNames, bookings]);
+
+  const legendDepartments = useMemo(() => {
+    const fromSheet = (departments ?? []).map((d) => d.trim()).filter(Boolean);
+    if (fromSheet.length) return fromSheet;
+    return Array.from(new Set(bookings.map((b) => b.Department).filter(Boolean))).sort();
+  }, [departments, bookings]);
 
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
 
@@ -79,7 +87,7 @@ export function TimelineView({
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        {DEPARTMENTS.map((d) => {
+        {legendDepartments.map((d) => {
           const c = deptColors(d);
           return (
             <div key={d} className="flex items-center gap-1.5 text-xs">
@@ -136,17 +144,26 @@ export function TimelineView({
                     const left = Math.max(0, (start / totalMinutes) * 100);
                     const width = Math.max(2, ((Math.min(end, totalMinutes) - Math.max(start, 0)) / totalMinutes) * 100);
                     const c = deptColors(b.Department);
+                    const status = normalizeVisitStatus(b.VisitStatus);
+                    const statusClasses =
+                      status === "Yes"
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                        : status === "No"
+                          ? "border-rose-500 bg-rose-50 text-rose-700"
+                          : `${c.border} ${c.bg}`;
+                    const title = `Visit status: ${status === "Unknown" ? "Not set" : status}`;
                     return (
                       <button
                         key={b.BookingID}
                         onClick={() => setSelected(b)}
                         style={{ left: `${left}%`, width: `${width}%` }}
-                        className={`absolute top-3 h-14 rounded-lg border-l-4 ${c.border} ${c.bg} px-2 py-1.5 text-left shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden`}
+                        title={title}
+                        className={`absolute top-3 h-14 rounded-lg border-l-4 ${statusClasses} px-2 py-1.5 text-left shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow-md overflow-hidden`}
                       >
-                        <p className={`text-[10px] font-bold ${c.text} truncate`}>
+                        <p className={`text-[10px] font-bold ${status === "Unknown" ? c.text : "text-inherit"} truncate`}>
                           {b.CustomerName || b.EmployeeName}
                         </p>
-                        <p className="text-[9px] text-slate-600 truncate">
+                        <p className="text-[9px] text-slate-700 truncate">
                           {b.StartTime}–{b.EndTime} · {b.Department}
                         </p>
                       </button>
