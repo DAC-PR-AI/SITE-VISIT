@@ -222,9 +222,46 @@ export const listPurposes = createServerFn({ method: "GET" }).handler(async () =
   }
 });
 
+import { enforceRateLimit } from "./rate-limit";
+
+function validateBookingInput(data: BookingInput) {
+  if (!data.EmployeeName || data.EmployeeName.trim().length < 2 || data.EmployeeName.length > 80) {
+    throw new Error("Invalid employee name.");
+  }
+  if (!data.CustomerName || data.CustomerName.trim().length < 2 || data.CustomerName.length > 80) {
+    throw new Error("Invalid customer name.");
+  }
+  if (!data.MobileNumber || data.MobileNumber.trim().length < 7 || data.MobileNumber.length > 20) {
+    throw new Error("Invalid mobile number.");
+  }
+  if (!data.ProjectName || data.ProjectName.length > 100) {
+    throw new Error("Invalid project name.");
+  }
+  if (!data.UnitNumber || data.UnitNumber.length > 50) {
+    throw new Error("Invalid unit number.");
+  }
+  if (!data.VisitDate || !/^\d{4}-\d{2}-\d{2}$/.test(data.VisitDate)) {
+    throw new Error("Invalid visit date format.");
+  }
+  if (!data.StartTime || !/^\d{2}:\d{2}$/.test(data.StartTime)) {
+    throw new Error("Invalid start time format.");
+  }
+  if (!data.EndTime || !/^\d{2}:\d{2}$/.test(data.EndTime)) {
+    throw new Error("Invalid end time format.");
+  }
+  if (data.Purpose && data.Purpose.length > 200) {
+    throw new Error("Purpose exceeds maximum length.");
+  }
+  if (data.Remarks && data.Remarks.length > 500) {
+    throw new Error("Remarks exceed maximum length.");
+  }
+}
+
 export const createBooking = createServerFn({ method: "POST" })
   .inputValidator((data: BookingInput) => data)
   .handler(async ({ data }) => {
+    enforceRateLimit("global", "createBooking");
+    validateBookingInput(data);
     const { overlaps } = await import("./booking-types");
 
     if (process.env.GOOGLE_SHEET_ID) {
@@ -301,13 +338,17 @@ export const createBooking = createServerFn({ method: "POST" })
   });
 
 function assertAdmin(code: string | undefined) {
-  const expected = process.env.ADMIN_CODE || "2727";
+  const expected = process.env.ADMIN_CODE;
+  if (!expected) {
+    throw new Error("ADMIN_CODE is not set on the server.");
+  }
   if (!code || code.trim() !== expected.trim()) throw new Error("Invalid admin code.");
 }
 
 export const verifyAdminCode = createServerFn({ method: "POST" })
   .inputValidator((data: { code: string }) => data)
   .handler(async ({ data }) => {
+    enforceRateLimit("global", "verifyAdmin");
     assertAdmin(data.code);
     return { ok: true };
   });
@@ -315,7 +356,9 @@ export const verifyAdminCode = createServerFn({ method: "POST" })
 export const updateBooking = createServerFn({ method: "POST" })
   .inputValidator((data: BookingInput & { BookingID: string; _row: number; adminCode: string }) => data)
   .handler(async ({ data }) => {
+    enforceRateLimit("global", "updateBooking");
     assertAdmin(data.adminCode);
+    validateBookingInput(data);
     const { overlaps } = await import("./booking-types");
 
     if (process.env.GOOGLE_SHEET_ID) {
@@ -362,6 +405,7 @@ export const updateBooking = createServerFn({ method: "POST" })
 export const deleteBooking = createServerFn({ method: "POST" })
   .inputValidator((data: { _row: number; adminCode: string }) => data)
   .handler(async ({ data }) => {
+    enforceRateLimit("global", "deleteBooking");
     assertAdmin(data.adminCode);
     if (process.env.GOOGLE_SHEET_ID) {
       const { clearRange } = await import("./sheets.server");
@@ -375,6 +419,10 @@ export const deleteBooking = createServerFn({ method: "POST" })
 export const updateBookingStatus = createServerFn({ method: "POST" })
   .inputValidator((data: { bookingId: string; status: VisitStatusValue }) => data)
   .handler(async ({ data }) => {
+    enforceRateLimit("global", "updateBookingStatus");
+    if (!["Yes", "No", "Unknown"].includes(data.status)) {
+      throw new Error("Invalid visit status.");
+    }
     if (process.env.GOOGLE_SHEET_ID) {
       const { getRange, updateRange } = await import("./sheets.server");
       const rows = await getRange("Bookings!A2:O");

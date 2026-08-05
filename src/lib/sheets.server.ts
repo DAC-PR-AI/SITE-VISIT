@@ -80,7 +80,9 @@ async function getServiceAccountToken(clientEmail: string, privateKey: string): 
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Google Service Account Auth Error (${res.status}): ${text}`);
+    // Log full OAuth error server-side only.
+    console.error(`[sheets] Service Account auth failed (${res.status})`);
+    throw new Error(`Google Service Account authentication failed (HTTP ${res.status}).`);
   }
 
   const data = (await res.json()) as { access_token: string; expires_in: number };
@@ -147,9 +149,11 @@ function appendQueryParam(url: string, param: string): string {
 async function handle(res: Response) {
   if (!res.ok) {
     const text = await res.text();
-    console.error(`[sheets] ${res.status}: ${text}`);
-    const err = new Error(`Google Sheets error (${res.status}): ${text.slice(0, 300)}`) as Error & { status?: number; body?: string };
+    // Log full detail server-side only — never forward raw API body to callers.
+    console.error(`[sheets] HTTP ${res.status} from Google Sheets API`);
+    const err = new Error(`Google Sheets operation failed (HTTP ${res.status}).`) as Error & { status?: number; body?: string };
     err.status = res.status;
+    // body is kept on the error object for internal isQuotaExceededError checks only
     err.body = text;
     throw err;
   }

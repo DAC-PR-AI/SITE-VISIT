@@ -7,15 +7,25 @@ import { Label } from "@/components/ui/label";
 import { verifyAdminCode } from "@/lib/sheets.functions";
 import { ShieldCheck } from "lucide-react";
 
-const KEY = "visitly_admin_code";
+const KEY = "_v_ac_state";
 
 export function getStoredAdminCode(): string {
   if (typeof window === "undefined") return "";
-  return window.sessionStorage.getItem(KEY) ?? "";
+  try {
+    return window.sessionStorage.getItem(KEY) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export function storeAdminCode(code: string) {
-  if (typeof window !== "undefined") window.sessionStorage.setItem(KEY, code);
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.setItem(KEY, code);
+    } catch {
+      // ignore storage errors
+    }
+  }
 }
 
 export function AdminCodeDialog({
