@@ -36,7 +36,9 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+// `error` is typed `unknown` by router-core — it can be any thrown value, not
+// just an Error. Both console.error and reportLovableError accept unknown.
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
