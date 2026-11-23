@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
-import { overlaps } from "@/lib/booking-types";
+import { overlaps, toMinutes } from "@/lib/booking-types";
 import { AdminCodeDialog, getStoredAdminCode } from "@/components/admin-code-dialog";
 
 const searchSchema = z.object({ edit: z.string().optional() });
@@ -81,12 +81,30 @@ export const Route = createFileRoute("/new")({
   component: NewBookingPage,
 });
 
-const TIME_SLOT_OPTIONS = [
-  { label: "10:00 – 12:00", value: "10:00-12:00", startTime: "10:00", endTime: "12:00" },
-  { label: "12:00 – 14:00", value: "12:00-14:00", startTime: "12:00", endTime: "14:00" },
-  { label: "14:00 – 16:00", value: "14:00-16:00", startTime: "14:00", endTime: "16:00" },
-  { label: "16:00 – 18:00", value: "16:00-18:00", startTime: "16:00", endTime: "18:00" },
-] as const;
+// Granularity of the time pickers, in seconds. 60 = one-minute steps, so any
+// start and end time is accepted and a visit can be any length at all.
+const TIME_STEP_SECONDS = 60;
+// Only used when there is no usable duration to carry over yet.
+const FALLBACK_VISIT_MINUTES = 60;
+const HHMM = /^\d{2}:\d{2}$/;
+
+/** Shifts an HH:mm string by the given number of minutes, clamped to the day. */
+function addMinutes(hhmm: string, minutes: number): string {
+  if (!HHMM.test(hhmm)) return hhmm;
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = Math.min(23 * 60 + 59, Math.max(0, h * 60 + m + minutes));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** "1 hr 30 min" for a valid forward range, otherwise null. */
+function formatDuration(start: string, end: string): string | null {
+  if (!HHMM.test(start) || !HHMM.test(end)) return null;
+  const mins = toMinutes(end) - toMinutes(start);
+  if (mins <= 0) return null;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h} hr` : null, m ? `${m} min` : null].filter(Boolean).join(" ");
+}
 
 const formSchema = z
   .object({
@@ -97,8 +115,8 @@ const formSchema = z
     ProjectName: z.string().min(1, "Project required"),
     UnitNumber: z.string().min(1, "Unit required"),
     VisitDate: z.string().min(1, "Date required"),
-    StartTime: z.string().min(1, "Start time required"),
-    EndTime: z.string().min(1, "End time required"),
+    StartTime: z.string().regex(/^\d{2}:\d{2}$/, "From time required"),
+    EndTime: z.string().regex(/^\d{2}:\d{2}$/, "To time required"),
     Purpose: z.string().trim().max(200).default(""),
     Remarks: z.string().trim().max(500).default(""),
   })
@@ -109,7 +127,7 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-type FormState = z.input<typeof formSchema> & { TimeSlot: string };
+type FormState = z.input<typeof formSchema>;
 
 function normalizeValue(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
@@ -136,10 +154,9 @@ function NewBookingPage() {
     UnitNumber: "",
     VisitDate: todayISO(),
     StartTime: "10:00",
-    EndTime: "12:00",
+    EndTime: "11:00",
     Purpose: "",
     Remarks: "",
-    TimeSlot: "10:00-12:00",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [gateOpen, setGateOpen] = useState(false);
@@ -147,7 +164,6 @@ function NewBookingPage() {
 
   useEffect(() => {
     if (editing) {
-      const slotOption = TIME_SLOT_OPTIONS.find((slot) => slot.startTime === editing.StartTime && slot.endTime === editing.EndTime);
       setForm({
         EmployeeName: editing.EmployeeName,
         Department: editing.Department,
@@ -160,7 +176,6 @@ function NewBookingPage() {
         EndTime: editing.EndTime,
         Purpose: editing.Purpose,
         Remarks: editing.Remarks,
-        TimeSlot: slotOption?.value ?? "10:00-12:00",
       });
     }
   }, [editing]);
@@ -276,16 +291,23 @@ function NewBookingPage() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const setTimeSlot = (value: string) => {
-    const slot = TIME_SLOT_OPTIONS.find((option) => option.value === value);
-    if (!slot) return;
-    setForm((f) => ({
-      ...f,
-      TimeSlot: slot.value,
-      StartTime: slot.startTime,
-      EndTime: slot.endTime,
-    }));
+  // Moving the start time carries the end time along with it, keeping whatever
+  // duration is already set — 20 minutes, 3 hours, anything. The end time stays
+  // freely editable afterwards, so the duration is never forced to a fixed size.
+  const setStartTime = (value: string) => {
+    setForm((f) => {
+      if (!HHMM.test(value)) return { ...f, StartTime: value };
+      const prevStart = HHMM.test(f.StartTime) ? toMinutes(f.StartTime) : null;
+      const prevEnd = HHMM.test(f.EndTime) ? toMinutes(f.EndTime) : null;
+      const heldMinutes =
+        prevStart !== null && prevEnd !== null && prevEnd > prevStart
+          ? prevEnd - prevStart
+          : FALLBACK_VISIT_MINUTES;
+      return { ...f, StartTime: value, EndTime: addMinutes(value, heldMinutes) };
+    });
   };
+
+  const duration = formatDuration(form.StartTime, form.EndTime);
 
   const c = deptColors(form.Department);
 
@@ -366,22 +388,34 @@ function NewBookingPage() {
               </Select>
             </Field>
 
-            <Field label="Visit Date" error={errors.VisitDate}>
-              <Input type="date" value={form.VisitDate} onChange={(e) => set("VisitDate", e.target.value)} min={todayISO()} />
-            </Field>
+            <div className="grid gap-5 sm:grid-cols-3 md:col-span-2">
+              <Field label="Visit Date" error={errors.VisitDate}>
+                <Input type="date" value={form.VisitDate} onChange={(e) => set("VisitDate", e.target.value)} min={todayISO()} />
+              </Field>
 
-            <Field label="Time Slot" error={errors.StartTime} className="md:col-span-2">
-              <Select value={form.TimeSlot} onValueChange={setTimeSlot}>
-                <SelectTrigger><SelectValue placeholder="Select visit slot" /></SelectTrigger>
-                <SelectContent>
-                  {TIME_SLOT_OPTIONS.map((slot) => (
-                    <SelectItem key={slot.value} value={slot.value}>
-                      {slot.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+              <Field label="From Time" error={errors.StartTime}>
+                <Input
+                  type="time"
+                  step={TIME_STEP_SECONDS}
+                  value={form.StartTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </Field>
+
+              <Field label="To Time" error={errors.EndTime}>
+                <Input
+                  type="time"
+                  step={TIME_STEP_SECONDS}
+                  value={form.EndTime}
+                  onChange={(e) => set("EndTime", e.target.value)}
+                />
+                {duration && (
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {duration}
+                  </p>
+                )}
+              </Field>
+            </div>
 
             <Field label="Purpose" error={errors.Purpose} className="md:col-span-2">
               <Select value={form.Purpose} onValueChange={(v) => set("Purpose", v)}>

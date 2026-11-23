@@ -11,9 +11,11 @@ import { toast } from "sonner";
 import { BookingDetailDialog } from "./booking-detail-dialog";
 import { updateBookingStatus } from "@/lib/sheets.functions";
 
-const START_HOUR = 8;
-const END_HOUR = 20;
-const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+// Baseline visible window. It widens automatically when a day holds visits
+// outside these hours, so a freely chosen time is never clipped off the grid.
+const DEFAULT_START_HOUR = 8;
+const DEFAULT_END_HOUR = 20;
+const HHMM = /^\d{1,2}:\d{2}$/;
 
 function todayISO() {
   const d = new Date();
@@ -96,7 +98,29 @@ export function TimelineView({
     return visible.length ? visible : [...DEPARTMENTS];
   }, [departments, bookings]);
 
-  const totalMinutes = (END_HOUR - START_HOUR) * 60;
+  // One column per hour, so the hour labels line up exactly with the blocks
+  // positioned across `totalMinutes`.
+  const { startHour, endHour, hours } = useMemo(() => {
+    let start = DEFAULT_START_HOUR;
+    let end = DEFAULT_END_HOUR;
+    for (const b of dayBookings) {
+      if (!HHMM.test(b.StartTime ?? "") || !HHMM.test(b.EndTime ?? "")) continue;
+      const s = toMinutes(b.StartTime);
+      const e = toMinutes(b.EndTime);
+      if (e <= s) continue;
+      start = Math.min(start, Math.floor(s / 60));
+      end = Math.max(end, Math.ceil(e / 60));
+    }
+    start = Math.max(0, start);
+    end = Math.min(24, Math.max(end, start + 1));
+    return {
+      startHour: start,
+      endHour: end,
+      hours: Array.from({ length: end - start }, (_, i) => start + i),
+    };
+  }, [dayBookings]);
+
+  const totalMinutes = (endHour - startHour) * 60;
 
   return (
     <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
@@ -153,7 +177,7 @@ export function TimelineView({
               Project
             </div>
             <div className="flex flex-1">
-              {HOURS.map((h) => (
+              {hours.map((h) => (
                 <div
                   key={h}
                   className="flex-1 border-r border-border/50 py-2 text-center font-mono text-[10px] text-muted-foreground last:border-r-0"
@@ -180,13 +204,13 @@ export function TimelineView({
                 <div className="relative flex-1 h-20">
                   {/* grid lines */}
                   <div className="absolute inset-0 flex pointer-events-none">
-                    {HOURS.map((h) => (
+                    {hours.map((h) => (
                       <div key={h} className="flex-1 border-r border-border/30 last:border-r-0" />
                     ))}
                   </div>
                   {items.map((b) => {
-                    const start = toMinutes(b.StartTime) - START_HOUR * 60;
-                    const end = toMinutes(b.EndTime) - START_HOUR * 60;
+                    const start = toMinutes(b.StartTime) - startHour * 60;
+                    const end = toMinutes(b.EndTime) - startHour * 60;
                     const left = Math.max(0, (start / totalMinutes) * 100);
                     const width = Math.max(2, ((Math.min(end, totalMinutes) - Math.max(start, 0)) / totalMinutes) * 100);
                     const departmentLabel = normalizeDepartmentName(b.Department);
